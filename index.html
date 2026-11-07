@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#070a11">
+  <meta name="description" content="Błyskawiczne wprowadzanie zadań magazynowych jedną ręką za pomocą jednego ciągłego gestu bez odrywania palca od ekranu.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
+  <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg">
+  <title>Ping-Pong Magazyn - Szybkie Wprowadzanie</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 1. GÓRNY PASEK PODGLĄDU I ANULOWANIA (TOP BAR - ~12%) -->
+    <header class="top-bar" id="topBar">
+      <div class="top-bar-header">
+        <div class="app-brand">
+          <span class="brand-badge">⚡ PING-PONG</span>
+          <span>Magazyn</span>
+        </div>
+        <div class="top-actions">
+          <button type="button" class="btn-icon" id="btnOpenInfo" title="Instrukcja obsługi" aria-label="Instrukcja obsługi">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>Pomoc</span>
+          </button>
+          <button type="button" class="btn-icon" id="btnOpenSettings" title="Edycja bazy pozycji" aria-label="Edycja bazy pozycji">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            <span>Baza</span>
+          </button>
+          <button type="button" class="btn-icon" id="btnOpenTasks" title="Otwórz listę zadań" aria-label="Otwórz listę zadań">
+            <span class="task-count-badge">0</span>
+            <span>Zadania</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Podgląd łańcucha na żywo -->
+      <div class="live-preview-box" id="livePreviewBox">
+        <div class="preview-chain">
+          <span class="preview-placeholder">[CO]</span>
+          <span class="preview-arrow">➔</span>
+          <span class="preview-placeholder">[SKĄD]</span>
+          <span class="preview-arrow">➔</span>
+          <span class="preview-placeholder">[DOKĄD]</span>
+          <span class="preview-qty-wrap"><span class="preview-placeholder">(x[ILE])</span></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 2. GŁÓWNY OBSZAR GESTÓW (GESTURE PAD - ~63%) -->
+    <main class="gesture-pad" id="gesturePad">
+      <!-- Wskaźnik pasa szybkiego (Turbo) w Kroku 1 (0% - 16%) -->
+      <div class="turbo-lane-stripe">
+        <div class="turbo-stripe-label">
+          <span>⚡ TURBO x8</span>
+        </div>
+      </div>
+
+      <!-- LEWA STREFA (0% - 50% szerokości) -->
+      <section class="drum-column" id="columnLeft">
+        <div class="column-header">
+          <div class="header-top-row">
+            <span class="column-step-badge">KROK 1</span>
+            <span class="lane-indicator hidden">🎯 PRECYZJA (x1)</span>
+          </div>
+          <div class="column-title">1. WYBIERZ TOWAR (CO)</div>
+        </div>
+
+        <div class="wheel-viewport">
+          <div class="target-window">
+            <span class="target-bracket-left">◀</span>
+            <span class="target-bracket-right">▶</span>
+          </div>
+          <div class="wheel-track"></div>
+        </div>
+      </section>
+
+      <!-- ŚRODKOWA LINIA PODZIAŁU ZE STREFĄ MARTWĄ (47% - 53%) -->
+      <div class="center-divider">
+        <div class="center-line-glow"></div>
+        <div class="ping-pong-arrow-hint">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- PRAWA STREFA (50% - 100% szerokości) -->
+      <section class="drum-column" id="columnRight">
+        <div class="column-header">
+          <div class="header-top-row">
+            <span class="column-step-badge">KROK 2</span>
+            <span class="lane-indicator hidden">🎯 PRECYZJA (x1)</span>
+          </div>
+          <div class="column-title">2. LOKALIZACJA (SKĄD)</div>
+        </div>
+
+        <div class="wheel-viewport">
+          <div class="target-window">
+            <span class="target-bracket-left">◀</span>
+            <span class="target-bracket-right">▶</span>
+          </div>
+          <div class="wheel-track"></div>
+        </div>
+      </section>
+
+      <!-- Płynny wskaźnik dotyku / kursor (Pointer Puck) -->
+      <div class="pointer-puck" id="pointerPuck"></div>
+
+      <!-- Pasek podpowiedzi -->
+      <div class="gesture-footer-hint">
+        Przesuwaj góra/dół • Przekraczaj środek ekranu • Puść w dowolnej chwili aby zapisać
+      </div>
+    </main>
+
+    <!-- 3. DOLNY PANEL ZADAŃ (DRAWER - ~25%, ROZWIJANY) -->
+    <aside class="task-drawer" id="taskDrawer">
+      <div class="drawer-header" id="drawerHandle">
+        <div class="drawer-handle"></div>
+        <div class="drawer-title-row">
+          <div class="drawer-title">
+            <span>📦 Zapisane zadania</span>
+            <span class="drawer-subtitle" id="drawerActiveCount">0 do zrobienia</span>
+          </div>
+          <div class="drawer-controls">
+            <button type="button" class="btn-drawer-action" id="btnExportTasks" title="Kopiuj zadania jako CSV do schowka">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+              <span>CSV</span>
+            </button>
+            <button type="button" class="btn-drawer-action" id="btnClearCompleted" title="Usuń wykonane zadania">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </button>
+            <button type="button" class="btn-drawer-action" id="btnToggleExpandDrawer" title="Rozwiń na pełny ekran">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pasek filtrów widoczny po rozwinięciu -->
+      <div class="drawer-filter-bar">
+        <button type="button" class="drawer-filter-btn active" data-filter="all">Wszystkie</button>
+        <button type="button" class="drawer-filter-btn" data-filter="active">Do zrobienia</button>
+        <button type="button" class="drawer-filter-btn" data-filter="completed">Ukończone</button>
+      </div>
+
+      <!-- Lista zadań -->
+      <div class="drawer-task-list" id="drawerTaskList">
+        <!-- Renderowane dynamicznie przez JS -->
+      </div>
+    </aside>
+
+    <!-- KONTENER NA POWIADOMIENIA TOAST -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- MODAL: EDYCJA BAZY DANYCH I USTAWIENIA -->
+    <dialog id="dbModal" closedby="any" class="app-modal" aria-labelledby="dbModalTitle">
+      <div class="modal-inner">
+        <div class="modal-header">
+          <h3 class="modal-title" id="dbModalTitle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <span>Edycja bazy i ustawienia</span>
+          </h3>
+          <button type="button" class="modal-close-btn" id="btnCloseDb" title="Zamknij">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Samoucząca się czołówka (TOP 6) -->
+          <div>
+            <div class="modal-section-title">
+              <span>🔥 Najczęstsze towary (Czołówka TOP 6)</span>
+              <button type="button" class="btn-danger-ghost" id="btnResetStats">Zresetuj liczniki</button>
+            </div>
+            <div class="top-stats-grid" id="topStatsList">
+              <!-- Renderowane dynamicznie -->
+            </div>
+          </div>
+
+          <!-- Ustawienia dźwięku i haptyki -->
+          <div>
+            <div class="modal-section-title">Sygnalizacja</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="settings-toggle-row">
+                <div class="settings-label">
+                  <span>Dźwięki Web Audio (Taktowanie)</span>
+                  <span class="settings-desc">Dźwiękowy feedback przy przewijaniu i zatwierdzaniu</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="toggleSound" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="settings-toggle-row">
+                <div class="settings-label">
+                  <span>Wibracje (Haptic Feedback)</span>
+                  <span class="settings-desc">Wibracje 8ms / 35ms na urządzeniach mobilnych</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="toggleVibration" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Edycja CO -->
+          <div class="db-field-group">
+            <label class="db-field-label" for="textareaCo">
+              <span>Lista 1: CO (Towary / Czynności)</span>
+              <span class="db-field-help">1 pozycja w linii</span>
+            </label>
+            <textarea id="textareaCo" class="db-textarea" rows="5"></textarea>
+          </div>
+
+          <!-- Edycja SKĄD -->
+          <div class="db-field-group">
+            <label class="db-field-label" for="textareaSkad">
+              <span>Lista 2: SKĄD (Lokalizacje początkowe)</span>
+              <span class="db-field-help">1 pozycja w linii</span>
+            </label>
+            <textarea id="textareaSkad" class="db-textarea" rows="4"></textarea>
+          </div>
+
+          <!-- Edycja DOKĄD -->
+          <div class="db-field-group">
+            <label class="db-field-label" for="textareaDokad">
+              <span>Lista 3: DOKĄD (Lokalizacje docelowe)</span>
+              <span class="db-field-help">1 pozycja w linii</span>
+            </label>
+            <textarea id="textareaDokad" class="db-textarea" rows="4"></textarea>
+          </div>
+
+          <!-- Edycja ILE -->
+          <div class="db-field-group">
+            <label class="db-field-label" for="textareaIle">
+              <span>Lista 4: ILE (Ilości / Jednostki)</span>
+              <span class="db-field-help">1 pozycja w linii</span>
+            </label>
+            <textarea id="textareaIle" class="db-textarea" rows="4"></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" id="btnResetDbDefaults">Fabryczna baza (60+)</button>
+          <button type="button" class="btn-primary" id="btnSaveDb">Zapisz zmiany</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- MODAL: INSTRUKCJA I PORADNIK PING-PONG -->
+    <dialog id="infoModal" closedby="any" class="app-modal" aria-labelledby="infoModalTitle">
+      <div class="modal-inner">
+        <div class="modal-header">
+          <h3 class="modal-title" id="infoModalTitle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            <span>Jak działa ciągły gest Ping-Pong?</span>
+          </h3>
+          <button type="button" class="modal-close-btn" id="btnCloseInfo" title="Zamknij">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="tutorial-steps">
+            <div class="tutorial-step-card">
+              <div class="tutorial-step-number">1</div>
+              <div class="tutorial-step-content">
+                <h4>KROK 1: Dotknij lewej strony (CO)</h4>
+                <p>Przyłóż kciuk do lewej połowy ekranu i przesuń góra/dół. Przy lewej krawędzi (0-16% szerokości) działa <b>Pas Szybki (x8)</b> dla długich list. Przejście bliżej środka automatycznie przełącza na <b>precyzję</b> bez żadnych przeskoków!</p>
+              </div>
+            </div>
+
+            <div class="tutorial-step-card">
+              <div class="tutorial-step-number">2</div>
+              <div class="tutorial-step-content">
+                <h4>KROK 2: Przesuń palec w prawo (SKĄD)</h4>
+                <p>Bez odrywania palca przejedź na prawą stronę ekranu. Towar z Kroku 1 zostaje natychmiast zatwierdzony, a prawa strona pozwala wybrać lokalizację początkową.</p>
+              </div>
+            </div>
+
+            <div class="tutorial-step-card">
+              <div class="tutorial-step-number">3</div>
+              <div class="tutorial-step-content">
+                <h4>KROK 3: Wróć palcem w lewo (DOKĄD)</h4>
+                <p>Przejedź palcem z powrotem na lewą stronę, aby wybrać lokalizację docelową.</p>
+              </div>
+            </div>
+
+            <div class="tutorial-step-card">
+              <div class="tutorial-step-number">4</div>
+              <div class="tutorial-step-content">
+                <h4>KROK 4: Ponownie w prawo (ILE)</h4>
+                <p>Wybierz ilość sztuk lub jednostek (palety, kartony).</p>
+              </div>
+            </div>
+
+            <div class="tutorial-step-card" style="border-color: var(--emerald-primary);">
+              <div class="tutorial-step-number" style="background: var(--emerald-primary);">✔</div>
+              <div class="tutorial-step-content">
+                <h4 style="color: var(--emerald-primary);">Wczesne zakończenie (Early Release)</h4>
+                <p>Możesz oderwać palec od ekranu w <b>DOWOLNYM</b> momencie (np. po samym towarze lub po SKĄD). Zadanie zapisuje się natychmiast z wybranymi dotąd danymi!</p>
+              </div>
+            </div>
+
+            <div class="tutorial-step-card" style="border-color: var(--crimson-danger);">
+              <div class="tutorial-step-number" style="background: var(--crimson-danger); color: #fff;">✕</div>
+              <div class="tutorial-step-content">
+                <h4 style="color: var(--crimson-danger);">Anulowanie zadania</h4>
+                <p>Jeśli zmienisz zdanie w trakcie gestu, przeciągnij palec na <b>Górny Pasek (Top Bar)</b> i puść ekran. Wpis zostanie skasowany bez zapisywania.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="justify-content: flex-end;">
+          <form method="dialog">
+            <button type="submit" class="btn-primary">Rozumiem, zaczynajmy!</button>
+          </form>
+        </div>
+      </div>
+    </dialog>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

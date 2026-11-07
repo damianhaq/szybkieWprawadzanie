@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#070a11"/>
+    </radialGradient>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="40" fill="url(#bgGrad)"/>
+  <rect x="8" y="8" width="176" height="176" rx="32" fill="none" stroke="#f59e0b" stroke-width="4" stroke-opacity="0.3"/>
+  
+  <!-- Błyskawica Ping-Pong -->
+  <polygon points="106,24 44,106 96,106 86,168 148,86 98,86" fill="url(#amberGrad)" />
+  
+  <!-- Strzałki gestu lewo-prawo -->
+  <path d="M 40 148 L 70 148 M 60 138 L 70 148 L 60 158" stroke="#06b6d4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 152 148 L 122 148 M 132 138 L 122 148 L 132 158" stroke="#10b981" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

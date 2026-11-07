@@ -1,0 +1,24 @@
+{
+  "name": "pingpong-magazyn",
+  "version": "1.0.0",
+  "description": "Mobilna aplikacja PWA do błyskawicznego wprowadzania zadań magazynowych jedną ręką za pomocą pojedynczego ciągłego gestu Ping-Pong",
+  "main": "js/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "npx serve .",
+    "test": "node test/verify.js",
+    "check": "node --check js/data.js js/storage.js js/audio.js js/drum.js js/gesture.js js/ui.js js/app.js sw.js"
+  },
+  "keywords": [
+    "pwa",
+    "mobile-first",
+    "warehouse",
+    "gestures",
+    "one-handed",
+    "ping-pong-ui",
+    "pointer-events",
+    "logistics"
+  ],
+  "author": "",
+  "license": "MIT"
+}
