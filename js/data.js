@@ -76,33 +76,30 @@ export const DEFAULT_DATABASE = {
     "Zszywki tapicerskie 14mm",
     "Żarówki LED E27 15W neutral"
   ],
-  skad: [
-    "Rampa 01 (Przyjęcia)",
-    "Rampa 02 (Przyjęcia)",
-    "Strefa Buforowa A",
-    "Regał Wysoki A-01..12",
-    "Regał Wysoki B-01..12",
-    "Regał Średni C-01..08",
+  // Wspólna baza lokalizacji magazynowych dla SKĄD i DOKĄD
+  lokalizacje: [
     "Antresola Drobnicowa",
     "Chłodnia Magazynowa",
-    "Strefa Kwarantanny",
+    "Dział Kontroli Jakości",
     "Dział Zwrotów (RMA)",
+    "Magazyn Odpadów/Złom",
     "Półki Kompletacji K-1",
-    "Magazyn Odpadów/Złom"
-  ],
-  dokad: [
+    "Rampa 01 (Przyjęcia)",
+    "Rampa 02 (Przyjęcia)",
     "Rampa 05 (Wysyłka)",
     "Rampa 06 (Wysyłka)",
-    "Stanowisko Pakowania 1",
-    "Stanowisko Pakowania 2",
-    "Strefa Konsolidacji",
+    "Regał Średni C-01..08",
     "Regał Wysoki A-01..12",
     "Regał Wysoki B-01..12",
+    "Stanowisko Pakowania 1",
+    "Stanowisko Pakowania 2",
+    "Strefa Buforowa A",
     "Strefa Etykietowania",
-    "Dział Kontroli Jakości",
-    "Warsztat / Serwis",
+    "Strefa Konsolidacji",
+    "Strefa Kwarantanny",
     "Strefa Wydawania Kurier",
-    "Utylizacja / Zniszczenie"
+    "Utylizacja / Zniszczenie",
+    "Warsztat / Serwis"
   ],
   ile: [
     "1",

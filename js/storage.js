@@ -47,11 +47,30 @@ export class StorageManager {
     }
   }
 
-  // Baza pozycji (CO, SKĄD, DOKĄD, ILE)
+  // Baza pozycji (CO, LOKALIZACJE, ILE)
   getDatabase() {
     try {
       const data = getStorage().getItem(STORAGE_KEYS.DB);
-      return data ? JSON.parse(data) : { ...DEFAULT_DATABASE };
+      let parsed = data ? JSON.parse(data) : { ...DEFAULT_DATABASE };
+
+      // Automatyczna migracja: jeśli w localStorage były osobne skad/dokad, zunifikuj do lokalizacje
+      if (!parsed.lokalizacje || !Array.isArray(parsed.lokalizacje)) {
+        const merged = Array.from(new Set([
+          ...(parsed.skad || []),
+          ...(parsed.dokad || []),
+          ...(DEFAULT_DATABASE.lokalizacje || [])
+        ])).sort((a, b) => a.localeCompare(b, 'pl', { sensitivity: 'base' }));
+        parsed.lokalizacje = merged;
+        delete parsed.skad;
+        delete parsed.dokad;
+        this.saveDatabase(parsed);
+      }
+
+      // Kompatybilność wsteczna
+      if (!parsed.skad) parsed.skad = parsed.lokalizacje;
+      if (!parsed.dokad) parsed.dokad = parsed.lokalizacje;
+
+      return parsed;
     } catch (e) {
       console.error('Błąd odczytu bazy:', e);
       return { ...DEFAULT_DATABASE };

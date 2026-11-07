@@ -282,8 +282,7 @@ export class UIManager {
     if (btnSaveDb) {
       btnSaveDb.addEventListener('click', () => {
         const coVal = document.getElementById('textareaCo').value;
-        const skadVal = document.getElementById('textareaSkad').value;
-        const dokadVal = document.getElementById('textareaDokad').value;
+        const lokVal = document.getElementById('textareaLokalizacje').value;
         const ileVal = document.getElementById('textareaIle').value;
 
         const parseLines = (text) =>
@@ -292,15 +291,23 @@ export class UIManager {
             .map(line => line.trim())
             .filter(line => line.length > 0);
 
+        const parsedLokalizacje = parseLines(lokVal);
+
         const newDb = {
           co: parseLines(coVal),
-          skad: parseLines(skadVal),
-          dokad: parseLines(dokadVal),
+          lokalizacje: parsedLokalizacje,
+          skad: parsedLokalizacje,
+          dokad: parsedLokalizacje,
           ile: parseLines(ileVal)
         };
 
         if (newDb.co.length === 0) {
           alert('Lista CO musi zawierać co najmniej jedną pozycję!');
+          return;
+        }
+
+        if (newDb.lokalizacje.length === 0) {
+          alert('Lista LOKALIZACJE musi zawierać co najmniej jedną pozycję!');
           return;
         }
 
@@ -347,13 +354,14 @@ export class UIManager {
   loadDbToInputs() {
     const db = storage.getDatabase();
     const textareaCo = document.getElementById('textareaCo');
-    const textareaSkad = document.getElementById('textareaSkad');
-    const textareaDokad = document.getElementById('textareaDokad');
+    const textareaLokalizacje = document.getElementById('textareaLokalizacje');
     const textareaIle = document.getElementById('textareaIle');
 
     if (textareaCo) textareaCo.value = (db.co || []).join('\n');
-    if (textareaSkad) textareaSkad.value = (db.skad || []).join('\n');
-    if (textareaDokad) textareaDokad.value = (db.dokad || []).join('\n');
+    if (textareaLokalizacje) {
+      const locs = db.lokalizacje || db.skad || [];
+      textareaLokalizacje.value = locs.join('\n');
+    }
     if (textareaIle) textareaIle.value = (db.ile || []).join('\n');
 
     this.loadTopStatsView();

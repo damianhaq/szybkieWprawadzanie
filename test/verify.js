@@ -14,13 +14,11 @@ globalThis.localStorage = new MockLocalStorage();
 
 console.log('--- TEST 1: Walidacja danych bazowych ---');
 console.assert(DEFAULT_DATABASE.co.length >= 60, `CO powinno mieć >= 60 pozycji, ma: ${DEFAULT_DATABASE.co.length}`);
-console.assert(DEFAULT_DATABASE.skad.length === 12, `SKĄD powinno mieć 12 pozycji, ma: ${DEFAULT_DATABASE.skad.length}`);
-console.assert(DEFAULT_DATABASE.dokad.length === 12, `DOKĄD powinno mieć 12 pozycji, ma: ${DEFAULT_DATABASE.dokad.length}`);
+console.assert(DEFAULT_DATABASE.lokalizacje.length >= 15, `LOKALIZACJE powinno mieć >= 15 pozycji, ma: ${DEFAULT_DATABASE.lokalizacje.length}`);
 console.assert(DEFAULT_DATABASE.ile.length >= 10, `ILE powinno mieć >= 10 pozycji, ma: ${DEFAULT_DATABASE.ile.length}`);
 console.log('✓ Dane bazowe poprawne:', {
   co: DEFAULT_DATABASE.co.length,
-  skad: DEFAULT_DATABASE.skad.length,
-  dokad: DEFAULT_DATABASE.dokad.length,
+  lokalizacje: DEFAULT_DATABASE.lokalizacje.length,
   ile: DEFAULT_DATABASE.ile.length
 });
 

@@ -50,10 +50,11 @@ export class GestureEngine {
   refreshData() {
     const coData = storage.getCoListWithTop();
     const db = storage.getDatabase();
+    const locList = (db.lokalizacje || db.skad || []).map(item => ({ text: item }));
 
     this.cachedData.coList = coData.items;
-    this.cachedData.skadList = (db.skad || []).map(item => ({ text: item }));
-    this.cachedData.dokadList = (db.dokad || []).map(item => ({ text: item }));
+    this.cachedData.skadList = locList;
+    this.cachedData.dokadList = locList;
     this.cachedData.ileList = (db.ile || []).map(item => ({ text: item }));
   }
 
