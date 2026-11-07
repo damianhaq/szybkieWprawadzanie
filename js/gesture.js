@@ -10,6 +10,7 @@ export class GestureEngine {
     this.drumRight = options.drumRight;
     this.previewEl = options.previewEl;
     this.pointerPuckEl = options.pointerPuckEl;
+    this.turboStripeEl = document.getElementById('turboLaneStripe');
     this.onTaskSaved = options.onTaskSaved || (() => {});
     this.onTaskCancelled = options.onTaskCancelled || (() => {});
 
@@ -62,6 +63,11 @@ export class GestureEngine {
     this.currentLane = 'precision';
     this.isInCancelZone = false;
     this.taskDraft = { co: null, skad: null, dokad: null, ile: null };
+
+    // Pas Turbo widoczny w Kroku 1
+    if (this.turboStripeEl) {
+      this.turboStripeEl.classList.remove('hidden');
+    }
 
     // Lewa kolumna: Krok 1 (CO)
     this.drumLeft.setStepData(
@@ -187,6 +193,11 @@ export class GestureEngine {
 
       this.currentStep = 2;
       feedback.stepCommit(1);
+
+      // Ukryj pasek turbo (aktywny tylko w Kroku 1)
+      if (this.turboStripeEl) {
+        this.turboStripeEl.classList.add('hidden');
+      }
 
       // Lewa strefa w tle natychmiast podmienia zawartość na KROK 3 (DOKĄD)
       this.drumLeft.setStepData(

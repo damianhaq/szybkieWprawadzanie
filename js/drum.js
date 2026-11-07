@@ -21,7 +21,7 @@ export class DrumColumn {
 
     // Zakres widocznych pozycji w bębnie (np. 5 w górę, 5 w dół)
     this.visibleSpan = 5;
-    this.itemHeight = 44; // Bazowa wysokość slotu w px
+    this.itemHeight = 52; // Bazowa wysokość slotu w px (zgodna z --slot-height: 52px)
   }
 
   // Ustawienie zawartości kolumny
@@ -151,20 +151,34 @@ export class DrumColumn {
         itemDiv.style.zIndex = `${40 - Math.abs(diff)}`;
       }
 
-      // Zawartość pozycji
+      // Zawartość pozycji - czytelne formatowanie dla długich nazw
       const itemText = typeof item === 'object' ? item.text : item;
       const isTop = typeof item === 'object' && item.isTop;
       const count = typeof item === 'object' && item.count;
 
-      let badgeHtml = '';
-      if (isTop) {
-        badgeHtml = `<span class="top-badge" title="Najczęściej wybierane (${count}x)">🔥 TOP</span>`;
+      let categoryHtml = '';
+      let titleHtml = '';
+
+      // Sprawdzamy czy towar posiada prefiks kategorii (np. "Chemia - Płyn...")
+      const dashIdx = typeof itemText === 'string' ? itemText.indexOf(' - ') : -1;
+      if (dashIdx !== -1) {
+        const cat = itemText.substring(0, dashIdx).trim();
+        const name = itemText.substring(dashIdx + 3).trim();
+        categoryHtml = `<span class="item-cat">${this.escapeHtml(cat)}</span>`;
+        titleHtml = `<span class="item-title">${this.escapeHtml(name)}</span>`;
+      } else {
+        titleHtml = `<span class="item-title">${this.escapeHtml(itemText)}</span>`;
       }
+
+      const topFlameHtml = isTop ? `<span class="top-flame-icon" title="Czołówka TOP (${count}x)">🔥</span>` : '';
 
       itemDiv.innerHTML = `
         <div class="item-content ${isTop ? 'has-top-badge' : ''}">
-          ${badgeHtml}
-          <span class="item-text">${this.escapeHtml(itemText)}</span>
+          ${topFlameHtml}
+          <div class="item-text-box">
+            ${categoryHtml}
+            ${titleHtml}
+          </div>
         </div>
       `;
 
