@@ -69,6 +69,8 @@ export class GestureEngine {
     this.isInCancelZone = false;
     this.isTransitionLocked = false;
     this.taskDraft = { co: null, skad: null, dokad: null, ile: null };
+    this.floatIndex = 0;
+    this.lastClientY = 0;
 
     this.clearTransitionBadge();
     this.hidePuckCallout();
@@ -142,7 +144,10 @@ export class GestureEngine {
     this.drumLeft.setActive(true);
     this.drumRight.setActive(false);
 
-    // Kotwica startowa dla relatywnego przewijania
+    // Kotwica startowa dla płynnego relatywnego przewijania
+    this.floatIndex = this.drumLeft.selectedIndex;
+    this.lastClientY = clientY;
+    this.drumLeft.setPosition(this.floatIndex);
     this.anchorY = clientY;
     this.anchorIndex = this.drumLeft.selectedIndex;
     this.isTransitionLocked = false;
@@ -222,6 +227,9 @@ export class GestureEngine {
       this.drumRight.setActive(true);
       this.drumRight.setZoom(1.0);
       this.drumRight.resetGauge();
+      this.floatIndex = this.drumRight.selectedIndex;
+      this.lastClientY = clientY;
+      this.drumRight.setPosition(this.floatIndex);
       this.anchorY = clientY;
       this.anchorIndex = this.drumRight.selectedIndex;
 
@@ -256,6 +264,9 @@ export class GestureEngine {
       this.drumLeft.setActive(true);
       this.drumLeft.setZoom(1.0);
       this.drumLeft.resetGauge();
+      this.floatIndex = this.drumLeft.selectedIndex;
+      this.lastClientY = clientY;
+      this.drumLeft.setPosition(this.floatIndex);
       this.anchorY = clientY;
       this.anchorIndex = this.drumLeft.selectedIndex;
 
@@ -280,6 +291,9 @@ export class GestureEngine {
       this.drumRight.setZoom(1.0);
       this.drumRight.resetGauge();
       this.drumLeft.setActive(false);
+      this.floatIndex = this.drumRight.selectedIndex;
+      this.lastClientY = clientY;
+      this.drumRight.setPosition(this.floatIndex);
       this.anchorY = clientY;
       this.anchorIndex = this.drumRight.selectedIndex;
 
@@ -304,8 +318,7 @@ export class GestureEngine {
       if (this.isTransitionLocked) {
         this.isTransitionLocked = false;
         this.clearTransitionBadge();
-        this.anchorY = clientY;
-        this.anchorIndex = this.drumLeft.selectedIndex;
+        this.lastClientY = clientY;
       }
 
       // Dynamiczny zoom kafelka na osi X: od lewej krawędzi (mini/szybki) do środka (duży kafelek/precyzyjny)
@@ -315,42 +328,26 @@ export class GestureEngine {
       this.currentZoom = currentZoom;
       this.drumLeft.setZoom(currentZoom);
 
-      // Płynna kompensacja kotwicy przy zmianie skali, aby wybrany element nie przeskakiwał na osi Y
-      if (Math.abs(currentZoom - this.lastZoom) > 0.035) {
-        this.anchorIndex = this.drumLeft.selectedIndex;
-        this.anchorY = clientY;
-        this.lastZoom = currentZoom;
-      }
-
       // Skok w px zależny od zoomu: 18px (szybki) do 42px (duży kafelek)
       const stepPx = Math.round(18 + currentZoom * 24);
-      const deltaY = clientY - this.anchorY;
-      const floatOffset = -deltaY / stepPx;
-      const deltaIndex = Math.round(floatOffset);
-      let fraction = floatOffset - deltaIndex;
-      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * stepPx));
-      const direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
+      const dy = clientY - this.lastClientY;
+      this.lastClientY = clientY;
 
-      let targetIndex = this.anchorIndex + deltaIndex;
       const totalItems = this.cachedData.coList.length;
+      this.floatIndex -= dy / stepPx;
+      this.floatIndex = Math.max(0, Math.min(totalItems - 1, this.floatIndex));
 
-      if (targetIndex < 0) {
-        targetIndex = 0;
-        this.anchorIndex = 0;
-        this.anchorY = clientY;
-        fraction = 0;
-      } else if (targetIndex >= totalItems) {
-        targetIndex = totalItems - 1;
-        this.anchorIndex = targetIndex;
-        this.anchorY = clientY;
-        fraction = 0;
-      }
-
-      const changed = this.drumLeft.setSelectedIndex(targetIndex, fraction);
+      const changed = this.drumLeft.setPosition(this.floatIndex);
       if (changed) {
         feedback.tick(currentZoom < 0.35);
         this.updatePreviewUI();
       }
+
+      const targetIndex = Math.round(this.floatIndex);
+      const diffFromTarget = this.floatIndex - targetIndex;
+      const distUnits = 0.5 - Math.abs(diffFromTarget);
+      const distPx = Math.max(0, Math.round(distUnits * stepPx));
+      const direction = diffFromTarget > 0.08 ? 'up' : (diffFromTarget < -0.08 ? 'down' : 'center');
 
       this.drumLeft.updateGauge(distPx, direction, false);
       if (currentZoom < 0.35) {
@@ -378,8 +375,7 @@ export class GestureEngine {
       if (this.isTransitionLocked) {
         this.isTransitionLocked = false;
         this.clearTransitionBadge();
-        this.anchorY = clientY;
-        this.anchorIndex = this.drumRight.selectedIndex;
+        this.lastClientY = clientY;
       }
 
       // Prawa strona: od prawej krawędzi (mini) do środka (duży kafelek)
@@ -389,41 +385,25 @@ export class GestureEngine {
       this.currentZoom = currentZoom;
       this.drumRight.setZoom(currentZoom);
 
-      if (Math.abs(currentZoom - this.lastZoom) > 0.035) {
-        this.anchorIndex = this.drumRight.selectedIndex;
-        this.anchorY = clientY;
-        this.lastZoom = currentZoom;
-      }
-
-      // Krok 2 (SKĄD - Prawa kolumna, stepPx zależne od zoomu)
       const stepPx = Math.round(18 + currentZoom * 24);
-      const deltaY = clientY - this.anchorY;
-      const floatOffset = -deltaY / stepPx;
-      const deltaIndex = Math.round(floatOffset);
-      let fraction = floatOffset - deltaIndex;
-      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * stepPx));
-      const direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
+      const dy = clientY - this.lastClientY;
+      this.lastClientY = clientY;
 
-      let targetIndex = this.anchorIndex + deltaIndex;
       const totalItems = this.cachedData.skadList.length;
+      this.floatIndex -= dy / stepPx;
+      this.floatIndex = Math.max(0, Math.min(totalItems - 1, this.floatIndex));
 
-      if (targetIndex < 0) {
-        targetIndex = 0;
-        this.anchorIndex = 0;
-        this.anchorY = clientY;
-        fraction = 0;
-      } else if (targetIndex >= totalItems) {
-        targetIndex = totalItems - 1;
-        this.anchorIndex = targetIndex;
-        this.anchorY = clientY;
-        fraction = 0;
-      }
-
-      const changed = this.drumRight.setSelectedIndex(targetIndex, fraction);
+      const changed = this.drumRight.setPosition(this.floatIndex);
       if (changed) {
         feedback.tick(currentZoom < 0.35);
         this.updatePreviewUI();
       }
+
+      const targetIndex = Math.round(this.floatIndex);
+      const diffFromTarget = this.floatIndex - targetIndex;
+      const distUnits = 0.5 - Math.abs(diffFromTarget);
+      const distPx = Math.max(0, Math.round(distUnits * stepPx));
+      const direction = diffFromTarget > 0.08 ? 'up' : (diffFromTarget < -0.08 ? 'down' : 'center');
 
       this.drumRight.updateGauge(distPx, direction, false);
       if (currentZoom < 0.35) {
@@ -451,8 +431,7 @@ export class GestureEngine {
       if (this.isTransitionLocked) {
         this.isTransitionLocked = false;
         this.clearTransitionBadge();
-        this.anchorY = clientY;
-        this.anchorIndex = this.drumLeft.selectedIndex;
+        this.lastClientY = clientY;
       }
 
       // Lewa strona: zoom od krawędzi do środka
@@ -462,41 +441,25 @@ export class GestureEngine {
       this.currentZoom = currentZoom;
       this.drumLeft.setZoom(currentZoom);
 
-      if (Math.abs(currentZoom - this.lastZoom) > 0.035) {
-        this.anchorIndex = this.drumLeft.selectedIndex;
-        this.anchorY = clientY;
-        this.lastZoom = currentZoom;
-      }
-
-      // Krok 3 (DOKĄD - Lewa kolumna, stepPx zależne od zoomu)
       const stepPx = Math.round(18 + currentZoom * 24);
-      const deltaY = clientY - this.anchorY;
-      const floatOffset = -deltaY / stepPx;
-      const deltaIndex = Math.round(floatOffset);
-      let fraction = floatOffset - deltaIndex;
-      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * stepPx));
-      const direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
+      const dy = clientY - this.lastClientY;
+      this.lastClientY = clientY;
 
-      let targetIndex = this.anchorIndex + deltaIndex;
       const totalItems = this.cachedData.dokadList.length;
+      this.floatIndex -= dy / stepPx;
+      this.floatIndex = Math.max(0, Math.min(totalItems - 1, this.floatIndex));
 
-      if (targetIndex < 0) {
-        targetIndex = 0;
-        this.anchorIndex = 0;
-        this.anchorY = clientY;
-        fraction = 0;
-      } else if (targetIndex >= totalItems) {
-        targetIndex = totalItems - 1;
-        this.anchorIndex = targetIndex;
-        this.anchorY = clientY;
-        fraction = 0;
-      }
-
-      const changed = this.drumLeft.setSelectedIndex(targetIndex, fraction);
+      const changed = this.drumLeft.setPosition(this.floatIndex);
       if (changed) {
         feedback.tick(currentZoom < 0.35);
         this.updatePreviewUI();
       }
+
+      const targetIndex = Math.round(this.floatIndex);
+      const diffFromTarget = this.floatIndex - targetIndex;
+      const distUnits = 0.5 - Math.abs(diffFromTarget);
+      const distPx = Math.max(0, Math.round(distUnits * stepPx));
+      const direction = diffFromTarget > 0.08 ? 'up' : (diffFromTarget < -0.08 ? 'down' : 'center');
 
       this.drumLeft.updateGauge(distPx, direction, false);
       if (currentZoom < 0.35) {
@@ -512,6 +475,7 @@ export class GestureEngine {
       if (this.isTransitionLocked) {
         this.isTransitionLocked = false;
         this.clearTransitionBadge();
+        this.lastClientY = clientY;
       }
 
       // Prawa strona: zoom od krawędzi do środka
@@ -521,41 +485,25 @@ export class GestureEngine {
       this.currentZoom = currentZoom;
       this.drumRight.setZoom(currentZoom);
 
-      if (Math.abs(currentZoom - this.lastZoom) > 0.035) {
-        this.anchorIndex = this.drumRight.selectedIndex;
-        this.anchorY = clientY;
-        this.lastZoom = currentZoom;
-      }
-
-      // Krok 4 (ILE - Prawa kolumna, stepPx zależne od zoomu)
       const stepPx = Math.round(18 + currentZoom * 24);
-      const deltaY = clientY - this.anchorY;
-      const floatOffset = -deltaY / stepPx;
-      const deltaIndex = Math.round(floatOffset);
-      let fraction = floatOffset - deltaIndex;
-      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * stepPx));
-      const direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
+      const dy = clientY - this.lastClientY;
+      this.lastClientY = clientY;
 
-      let targetIndex = this.anchorIndex + deltaIndex;
       const totalItems = this.cachedData.ileList.length;
+      this.floatIndex -= dy / stepPx;
+      this.floatIndex = Math.max(0, Math.min(totalItems - 1, this.floatIndex));
 
-      if (targetIndex < 0) {
-        targetIndex = 0;
-        this.anchorIndex = 0;
-        this.anchorY = clientY;
-        fraction = 0;
-      } else if (targetIndex >= totalItems) {
-        targetIndex = totalItems - 1;
-        this.anchorIndex = targetIndex;
-        this.anchorY = clientY;
-        fraction = 0;
-      }
-
-      const changed = this.drumRight.setSelectedIndex(targetIndex, fraction);
+      const changed = this.drumRight.setPosition(this.floatIndex);
       if (changed) {
         feedback.tick(currentZoom < 0.35);
         this.updatePreviewUI();
       }
+
+      const targetIndex = Math.round(this.floatIndex);
+      const diffFromTarget = this.floatIndex - targetIndex;
+      const distUnits = 0.5 - Math.abs(diffFromTarget);
+      const distPx = Math.max(0, Math.round(distUnits * stepPx));
+      const direction = diffFromTarget > 0.08 ? 'up' : (diffFromTarget < -0.08 ? 'down' : 'center');
 
       this.drumRight.updateGauge(distPx, direction, false);
       if (currentZoom < 0.35) {
@@ -584,8 +532,8 @@ export class GestureEngine {
     this.hidePointerPuck();
     this.drumLeft.resetGauge();
     this.drumRight.resetGauge();
-    this.drumLeft.render(0);
-    this.drumRight.render(0);
+    this.drumLeft.setPosition(this.drumLeft.selectedIndex);
+    this.drumRight.setPosition(this.drumRight.selectedIndex);
 
     // Sprawdzenie strefy anulowania
     if (this.isInCancelZone) {

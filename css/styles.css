@@ -382,6 +382,8 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
 }
 
 /* OKNO DOCELOWE / RAMKA WYBORU (TARGET WINDOW) */
@@ -503,7 +505,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.05s linear, opacity 0.05s linear;
+  transition: none;
   will-change: transform, opacity;
   transform-origin: center center;
 }

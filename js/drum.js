@@ -20,10 +20,12 @@ export class DrumColumn {
     this.zoomIndicatorEl = this.container.querySelector('.zoom-indicator');
     this.gaugeEl = this.container.querySelector('.target-gauge-indicator');
 
-    // Zakres widocznych pozycji w bębnie (np. 5 w górę, 5 w dół)
-    this.visibleSpan = 5;
+    // Zakres widocznych pozycji w bębnie (dynamicznie dostosowany do wysokości ekranu)
+    this.visibleSpan = 10;
     this.itemHeight = 54; // Dynamiczna wysokość slotu w px zależna od zoomu
     this.fraction = 0;
+    this.floatY = 0;
+    this.nodeCache = new Map();
   }
 
   // Ustawienie zawartości kolumny
@@ -33,7 +35,15 @@ export class DrumColumn {
     this.stepSubtitle = subtitle;
     this.items = items || [];
     this.selectedIndex = Math.max(0, Math.min(initialIndex, this.items.length - 1));
+    this.floatY = this.selectedIndex;
     this.fraction = 0;
+
+    if (this.nodeCache) {
+      this.nodeCache.clear();
+    }
+    if (this.wheelEl) {
+      this.wheelEl.replaceChildren();
+    }
 
     if (this.titleEl) {
       this.titleEl.textContent = title;
@@ -43,7 +53,7 @@ export class DrumColumn {
     }
 
     this.updateZoomIndicator();
-    this.render(0);
+    this.render();
     this.resetGauge();
   }
 
@@ -68,6 +78,9 @@ export class DrumColumn {
       // Wysokość kafelka skaluje się od 36px (mini) do 58px (duży)
       this.itemHeight = Math.round(36 + this.zoom * 22);
 
+      if (this.container) {
+        this.container.style.setProperty('--slot-height', `${this.itemHeight}px`);
+      }
       if (this.targetWindowEl) {
         this.targetWindowEl.style.height = `${this.itemHeight}px`;
       }
@@ -77,7 +90,7 @@ export class DrumColumn {
 
       this.container.classList.toggle('zoom-compact', this.zoom < 0.45);
       this.updateZoomIndicator();
-      this.render(this.fraction);
+      this.render();
     }
   }
 
@@ -99,12 +112,29 @@ export class DrumColumn {
   setLane() {}
   hideLaneIndicator() {}
 
+  // Płynne pozycjonowanie zmiennoprzecinkowe (Continuous Float Scrolling)
+  setPosition(floatY) {
+    const total = this.items.length;
+    if (total === 0) return false;
+    const clampedY = Math.max(0, Math.min(total - 1, floatY));
+    const targetIndex = Math.round(clampedY);
+    const indexChanged = targetIndex !== this.selectedIndex;
+    this.selectedIndex = targetIndex;
+    this.floatY = clampedY;
+    this.fraction = clampedY - targetIndex;
+    this.render();
+    return indexChanged;
+  }
+
   setSelectedIndex(index, fraction = 0) {
-    const clamped = Math.max(0, Math.min(index, this.items.length - 1));
+    const total = this.items.length;
+    if (total === 0) return false;
+    const clamped = Math.max(0, Math.min(total - 1, index));
     const indexChanged = clamped !== this.selectedIndex;
     this.selectedIndex = clamped;
+    this.floatY = Math.max(0, Math.min(total - 1, clamped + fraction));
     this.fraction = fraction;
-    this.render(fraction);
+    this.render();
     return indexChanged;
   }
 
@@ -173,8 +203,8 @@ export class DrumColumn {
     return this.items[this.selectedIndex] || null;
   }
 
-  // Renderowanie elementów w oknie bębna z efektem walca 3D
-  render(fraction = 0) {
+  // Renderowanie elementów w oknie bębna z ciągłym pozycjonowaniem i płaskim stylem (Flat Design)
+  render() {
     if (!this.wheelEl) return;
     const total = this.items.length;
     if (total === 0) {
@@ -182,74 +212,112 @@ export class DrumColumn {
       return;
     }
 
+    const currentFloat = typeof this.floatY === 'number' ? this.floatY : this.selectedIndex;
     const current = this.selectedIndex;
-    const start = Math.max(0, current - this.visibleSpan);
-    const end = Math.min(total - 1, current + this.visibleSpan);
 
-    // Budujemy elementy tylko dla okna widocznego wokół wybranego
+    // Obliczamy dynamicznie visibleSpan, aby wypełnić cały widok i wyjść poza krawędzie
+    const containerHeight = this.wheelEl.parentElement?.clientHeight || 450;
+    const halfHeight = containerHeight / 2;
+    const spanNeeded = Math.ceil(halfHeight / Math.min(32, this.itemHeight)) + 3;
+    const visibleSpan = Math.max(10, spanNeeded);
+
+    const start = Math.max(0, Math.floor(currentFloat - visibleSpan));
+    const end = Math.min(total - 1, Math.ceil(currentFloat + visibleSpan));
+
+    if (!this.nodeCache) {
+      this.nodeCache = new Map();
+    }
+
+    const activeIndices = new Set();
     const fragment = document.createDocumentFragment();
 
     for (let i = start; i <= end; i++) {
-      const item = this.items[i];
-      const diff = i - current; // 0 to wybrany, ujemne to wyżej, dodatnie niżej
+      activeIndices.add(i);
+      const visualDiff = i - currentFloat;
 
-      const itemDiv = document.createElement('div');
-      itemDiv.className = 'wheel-item';
-      itemDiv.dataset.index = i;
+      let itemDiv = this.nodeCache.get(i);
+      if (!itemDiv) {
+        itemDiv = this.createItemElement(i);
+        this.nodeCache.set(i, itemDiv);
+      }
 
-      const isSelected = diff === 0;
-      if (isSelected) {
+      const isSelected = i === current;
+      if (isSelected && !itemDiv.classList.contains('selected')) {
         itemDiv.classList.add('selected');
+      } else if (!isSelected && itemDiv.classList.contains('selected')) {
+        itemDiv.classList.remove('selected');
       }
 
-      // Wyrównanie i 3D transformacja bębna z fizycznym mikroruchem (sub-pixel parallax)
-      const visualDiff = diff + fraction;
-      const angle = visualDiff * 14; // łagodny kąt obrotu walca
+      // Czysta, płaska transformacja 2D - bez agresywnych kątów 3D, które składają kafelki
       const translateY = visualDiff * this.itemHeight;
-      const translateZ = -Math.abs(visualDiff) * 16;
       const baseScale = 0.82 + this.zoom * 0.22;
-      const scale = Math.max(0.68, baseScale - Math.abs(visualDiff) * 0.06);
-      const opacity = isSelected && fraction === 0 ? 1 : Math.max(0.12, 0.90 - Math.abs(visualDiff) * 0.25);
+      const scale = Math.max(0.70, baseScale - Math.abs(visualDiff) * 0.04);
+      // Płynna, łagodna krzywa przezroczystości (krawędzie maskuje gradient CSS)
+      const opacity = Math.max(0.25, 1.0 - Math.abs(visualDiff) * 0.10);
 
-      itemDiv.style.transform = `translate3d(0px, ${translateY}px, ${translateZ}px) rotateX(${-angle}deg) scale(${scale})`;
-      itemDiv.style.opacity = `${opacity}`;
-      itemDiv.style.zIndex = `${50 - Math.round(Math.abs(visualDiff) * 10)}`;
+      itemDiv.style.transform = `translate3d(0px, ${translateY.toFixed(1)}px, 0px) scale(${scale.toFixed(3)})`;
+      itemDiv.style.opacity = opacity.toFixed(2);
+      itemDiv.style.zIndex = `${50 - Math.min(45, Math.round(Math.abs(visualDiff) * 5))}`;
 
-      // Zawartość pozycji - czytelne formatowanie dla długich nazw
-      const itemText = typeof item === 'object' ? item.text : item;
-      const isTop = typeof item === 'object' && item.isTop;
-      const count = typeof item === 'object' && item.count;
-
-      let categoryHtml = '';
-      let titleHtml = '';
-
-      // Sprawdzamy czy towar posiada prefiks kategorii (np. "Chemia - Płyn...")
-      const dashIdx = typeof itemText === 'string' ? itemText.indexOf(' - ') : -1;
-      if (dashIdx !== -1) {
-        const cat = itemText.substring(0, dashIdx).trim();
-        const name = itemText.substring(dashIdx + 3).trim();
-        categoryHtml = `<span class="item-cat">${this.escapeHtml(cat)}</span>`;
-        titleHtml = `<span class="item-title">${this.escapeHtml(name)}</span>`;
-      } else {
-        titleHtml = `<span class="item-title">${this.escapeHtml(itemText)}</span>`;
+      if (itemDiv.parentElement !== this.wheelEl) {
+        fragment.appendChild(itemDiv);
       }
-
-      const topFlameHtml = isTop ? `<span class="top-flame-icon" title="Czołówka TOP (${count}x)">🔥</span>` : '';
-
-      itemDiv.innerHTML = `
-        <div class="drum-card ${isTop ? 'card-top' : ''}">
-          ${topFlameHtml}
-          <div class="card-text-box">
-            ${categoryHtml}
-            ${titleHtml}
-          </div>
-        </div>
-      `;
-
-      fragment.appendChild(itemDiv);
     }
 
-    this.wheelEl.replaceChildren(fragment);
+    if (fragment.childNodes.length > 0) {
+      this.wheelEl.appendChild(fragment);
+    }
+
+    // Usuwamy elementy z DOM, które wyszły poza widoczny zakres
+    for (const [idx, node] of this.nodeCache.entries()) {
+      if (!activeIndices.has(idx)) {
+        if (node.parentElement === this.wheelEl) {
+          this.wheelEl.removeChild(node);
+        }
+        if (Math.abs(idx - current) > visibleSpan * 2) {
+          this.nodeCache.delete(idx);
+        }
+      }
+    }
+  }
+
+  createItemElement(i) {
+    const item = this.items[i];
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'wheel-item';
+    itemDiv.dataset.index = i;
+
+    const itemText = typeof item === 'object' ? item.text : item;
+    const isTop = typeof item === 'object' && item.isTop;
+    const count = typeof item === 'object' && item.count;
+
+    let categoryHtml = '';
+    let titleHtml = '';
+
+    // Sprawdzamy czy towar posiada prefiks kategorii (np. "Chemia - Płyn...")
+    const dashIdx = typeof itemText === 'string' ? itemText.indexOf(' - ') : -1;
+    if (dashIdx !== -1) {
+      const cat = itemText.substring(0, dashIdx).trim();
+      const name = itemText.substring(dashIdx + 3).trim();
+      categoryHtml = `<span class="item-cat">${this.escapeHtml(cat)}</span>`;
+      titleHtml = `<span class="item-title">${this.escapeHtml(name)}</span>`;
+    } else {
+      titleHtml = `<span class="item-title">${this.escapeHtml(itemText)}</span>`;
+    }
+
+    const topFlameHtml = isTop ? `<span class="top-flame-icon" title="Czołówka TOP (${count}x)">🔥</span>` : '';
+
+    itemDiv.innerHTML = `
+      <div class="drum-card ${isTop ? 'card-top' : ''}">
+        ${topFlameHtml}
+        <div class="card-text-box">
+          ${categoryHtml}
+          ${titleHtml}
+        </div>
+      </div>
+    `;
+
+    return itemDiv;
   }
 
   escapeHtml(str) {
