@@ -296,7 +296,7 @@ export class GestureEngine {
         const distToCommitX = Math.max(0, Math.round(rightThreshold - clientX));
         this.drumLeft.setZoom(1.0);
         this.drumLeft.updateGauge(0, 'center', true, distToCommitX, 'SKĄD');
-        this.updatePuckCallout(`🔒 ZABLOKOWANE (${distToCommitX}px do SKĄD)`, true);
+        this.updatePuckCallout(`ZABLOKOWANE (${distToCommitX}px do SKĄD)`, true);
         this.updateTransitionBadge(`➔ ${distToCommitX}px`);
         return;
       }
@@ -354,9 +354,9 @@ export class GestureEngine {
 
       this.drumLeft.updateGauge(distPx, direction, false);
       if (currentZoom < 0.35) {
-        this.updatePuckCallout(`⚡ SZYBKO (zoom ${Math.round(currentZoom * 100)}%)`);
+        this.updatePuckCallout(`SZYBKO (${Math.round(currentZoom * 100)}%)`);
       } else if (direction === 'center') {
-        this.updatePuckCallout(`● PRECYZJA (${distPx}px do zmiany)`);
+        this.updatePuckCallout(`PRECYZJA (${distPx}px do zmiany)`);
       } else if (direction === 'up') {
         this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
       } else {
@@ -370,7 +370,7 @@ export class GestureEngine {
         const distToCommitX = Math.max(0, Math.round(clientX - leftThreshold));
         this.drumRight.setZoom(1.0);
         this.drumRight.updateGauge(0, 'center', true, distToCommitX, 'DOKĄD');
-        this.updatePuckCallout(`🔒 ZABLOKOWANE (${distToCommitX}px do DOKĄD)`, true);
+        this.updatePuckCallout(`ZABLOKOWANE (${distToCommitX}px do DOKĄD)`, true);
         this.updateTransitionBadge(`◀ ${distToCommitX}px`);
         return;
       }
@@ -427,9 +427,9 @@ export class GestureEngine {
 
       this.drumRight.updateGauge(distPx, direction, false);
       if (currentZoom < 0.35) {
-        this.updatePuckCallout(`⚡ SZYBKO (zoom ${Math.round(currentZoom * 100)}%)`);
+        this.updatePuckCallout(`SZYBKO (${Math.round(currentZoom * 100)}%)`);
       } else if (direction === 'center') {
-        this.updatePuckCallout(`● PRECYZJA (${distPx}px do zmiany)`);
+        this.updatePuckCallout(`PRECYZJA (${distPx}px do zmiany)`);
       } else if (direction === 'up') {
         this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
       } else {
@@ -443,7 +443,7 @@ export class GestureEngine {
         const distToCommitX = Math.max(0, Math.round(rightThreshold - clientX));
         this.drumLeft.setZoom(1.0);
         this.drumLeft.updateGauge(0, 'center', true, distToCommitX, 'ILE');
-        this.updatePuckCallout(`🔒 ZABLOKOWANE (${distToCommitX}px do ILE)`, true);
+        this.updatePuckCallout(`ZABLOKOWANE (${distToCommitX}px do ILE)`, true);
         this.updateTransitionBadge(`➔ ${distToCommitX}px`);
         return;
       }
@@ -500,9 +500,9 @@ export class GestureEngine {
 
       this.drumLeft.updateGauge(distPx, direction, false);
       if (currentZoom < 0.35) {
-        this.updatePuckCallout(`⚡ SZYBKO (zoom ${Math.round(currentZoom * 100)}%)`);
+        this.updatePuckCallout(`SZYBKO (${Math.round(currentZoom * 100)}%)`);
       } else if (direction === 'center') {
-        this.updatePuckCallout(`● PRECYZJA (${distPx}px do zmiany)`);
+        this.updatePuckCallout(`PRECYZJA (${distPx}px do zmiany)`);
       } else if (direction === 'up') {
         this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
       } else {
@@ -559,9 +559,9 @@ export class GestureEngine {
 
       this.drumRight.updateGauge(distPx, direction, false);
       if (currentZoom < 0.35) {
-        this.updatePuckCallout(`⚡ SZYBKO (zoom ${Math.round(currentZoom * 100)}%)`);
+        this.updatePuckCallout(`SZYBKO (${Math.round(currentZoom * 100)}%)`);
       } else if (direction === 'center') {
-        this.updatePuckCallout('● PRECYZJA (Puść aby zapisać)');
+        this.updatePuckCallout('PRECYZJA (Puść aby zapisać)');
       } else if (direction === 'up') {
         this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
       } else {

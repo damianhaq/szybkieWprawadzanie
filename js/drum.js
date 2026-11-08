@@ -84,13 +84,13 @@ export class DrumColumn {
   updateZoomIndicator() {
     if (!this.zoomIndicatorEl) return;
     if (this.zoom >= 0.7) {
-      this.zoomIndicatorEl.textContent = '🔍 100% PRECYZJA';
+      this.zoomIndicatorEl.textContent = '100% PRECYZJA';
       this.zoomIndicatorEl.className = 'zoom-indicator zoom-precise';
     } else if (this.zoom <= 0.35) {
-      this.zoomIndicatorEl.textContent = '⚡ SZYBKI PODGLĄD';
+      this.zoomIndicatorEl.textContent = 'SZYBKI PODGLĄD';
       this.zoomIndicatorEl.className = 'zoom-indicator zoom-fast';
     } else {
-      this.zoomIndicatorEl.textContent = `🔍 ZOOM ${Math.round(this.zoom * 100)}%`;
+      this.zoomIndicatorEl.textContent = `ZOOM ${Math.round(this.zoom * 100)}%`;
       this.zoomIndicatorEl.className = 'zoom-indicator';
     }
   }
