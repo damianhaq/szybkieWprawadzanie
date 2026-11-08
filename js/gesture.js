@@ -12,7 +12,6 @@ export class GestureEngine {
     this.pointerPuckEl = options.pointerPuckEl;
     this.puckCalloutEl = document.getElementById('puckDistanceCallout');
     this.transitionDistanceBadge = document.getElementById('transitionDistanceBadge');
-    this.turboStripeEl = document.getElementById('turboLaneStripe');
     this.onTaskSaved = options.onTaskSaved || (() => {});
     this.onTaskCancelled = options.onTaskCancelled || (() => {});
 
@@ -20,7 +19,8 @@ export class GestureEngine {
     this.isDragging = false;
     this.activePointerId = null;
     this.currentStep = 1; // 1: CO (L), 2: SKĄD (P), 3: DOKĄD (L), 4: ILE (P)
-    this.currentLane = 'precision'; // 'precision' | 'turbo' (dla Kroku 1)
+    this.currentZoom = 1.0; // Płynny zoom 2D na osi X (0.0: kompaktowy/szybki -> 1.0: duży kafelek/precyzyjny)
+    this.lastZoom = 1.0;
     this.isInCancelZone = false;
     this.isTransitionLocked = false; // Blokada korytarza przejścia w bok przed przypadkową zmianą pozycji
 
@@ -64,18 +64,14 @@ export class GestureEngine {
   // Przygotowanie widoku do Kroku 1
   resetToStep1() {
     this.currentStep = 1;
-    this.currentLane = 'precision';
+    this.currentZoom = 1.0;
+    this.lastZoom = 1.0;
     this.isInCancelZone = false;
     this.isTransitionLocked = false;
     this.taskDraft = { co: null, skad: null, dokad: null, ile: null };
 
     this.clearTransitionBadge();
     this.hidePuckCallout();
-
-    // Pas Turbo widoczny w Kroku 1
-    if (this.turboStripeEl) {
-      this.turboStripeEl.classList.remove('hidden');
-    }
 
     // Lewa kolumna: Krok 1 (CO)
     this.drumLeft.setStepData(
@@ -85,8 +81,8 @@ export class GestureEngine {
       this.cachedData.coList,
       0
     );
+    this.drumLeft.setZoom(1.0);
     this.drumLeft.setActive(true);
-    this.drumLeft.hideLaneIndicator();
 
     // Prawa kolumna: Podgląd Kroku 2 (SKĄD)
     this.drumRight.setStepData(
@@ -96,8 +92,8 @@ export class GestureEngine {
       this.cachedData.skadList,
       0
     );
+    this.drumRight.setZoom(1.0);
     this.drumRight.setActive(false);
-    this.drumRight.hideLaneIndicator();
 
     this.updatePreviewUI();
     this.hidePointerPuck();
@@ -138,10 +134,11 @@ export class GestureEngine {
     this.taskDraft = { co: null, skad: null, dokad: null, ile: null };
     this.hasBeenInLeftZone = clientX <= leftThreshold;
 
-    // Wyznaczenie pasa ruchu w lewej kolumnie (Pas Szybki: 0 - 16% szerokości)
-    const isTurbo = clientX <= width * 0.16;
-    this.currentLane = isTurbo ? 'turbo' : 'precision';
-    this.drumLeft.setLane(this.currentLane);
+    // Początkowy zoom kafelka na podstawie pozycji X palca
+    const initialZoom = Math.max(0, Math.min(1, (clientX - width * 0.04) / (width * 0.30)));
+    this.currentZoom = initialZoom;
+    this.lastZoom = initialZoom;
+    this.drumLeft.setZoom(initialZoom);
     this.drumLeft.setActive(true);
     this.drumRight.setActive(false);
 
@@ -206,12 +203,9 @@ export class GestureEngine {
       this.taskDraft.co = selectedItem ? selectedItem.text : '';
 
       this.currentStep = 2;
+      this.currentZoom = 1.0;
+      this.lastZoom = 1.0;
       feedback.stepCommit(1);
-
-      // Ukryj pasek turbo (aktywny tylko w Kroku 1)
-      if (this.turboStripeEl) {
-        this.turboStripeEl.classList.add('hidden');
-      }
 
       // Lewa strefa w tle natychmiast podmienia zawartość na KROK 3 (DOKĄD)
       this.drumLeft.setStepData(
@@ -221,11 +215,12 @@ export class GestureEngine {
         this.cachedData.dokadList,
         0
       );
+      this.drumLeft.setZoom(1.0);
       this.drumLeft.setActive(false);
-      this.drumLeft.hideLaneIndicator();
 
       // Prawa strefa staje się aktywna (KROK 2: SKĄD)
       this.drumRight.setActive(true);
+      this.drumRight.setZoom(1.0);
       this.drumRight.resetGauge();
       this.anchorY = clientY;
       this.anchorIndex = this.drumRight.selectedIndex;
@@ -242,6 +237,8 @@ export class GestureEngine {
       this.taskDraft.skad = selectedItem ? selectedItem.text : '';
 
       this.currentStep = 3;
+      this.currentZoom = 1.0;
+      this.lastZoom = 1.0;
       feedback.stepCommit(2);
 
       // Prawa strefa w tle natychmiast podmienia zawartość na KROK 4 (ILE)
@@ -252,12 +249,13 @@ export class GestureEngine {
         this.cachedData.ileList,
         0
       );
+      this.drumRight.setZoom(1.0);
       this.drumRight.setActive(false);
 
       // Lewa strefa staje się aktywna (KROK 3: DOKĄD)
       this.drumLeft.setActive(true);
+      this.drumLeft.setZoom(1.0);
       this.drumLeft.resetGauge();
-      this.drumLeft.hideLaneIndicator();
       this.anchorY = clientY;
       this.anchorIndex = this.drumLeft.selectedIndex;
 
@@ -273,10 +271,13 @@ export class GestureEngine {
       this.taskDraft.dokad = selectedItem ? selectedItem.text : '';
 
       this.currentStep = 4;
+      this.currentZoom = 1.0;
+      this.lastZoom = 1.0;
       feedback.stepCommit(3);
 
       // Prawa strefa staje się aktywna (KROK 4: ILE)
       this.drumRight.setActive(true);
+      this.drumRight.setZoom(1.0);
       this.drumRight.resetGauge();
       this.drumLeft.setActive(false);
       this.anchorY = clientY;
@@ -286,14 +287,14 @@ export class GestureEngine {
       return;
     }
 
-    // 3. Relatywne przewijanie aktywnej kolumny (Relative Scrolling) z blokadą korytarza przejścia
+    // 3. Relatywne przewijanie aktywnej kolumny z kafelkami i dynamicznym zoomem 2D
     if (this.currentStep === 1) {
       // Jeśli palec zmierza w prawo w stronę linii środkowej, natychmiast blokujemy ruch pionowy!
-      // Dzięki temu poziomy ruch kciuka w prawo nigdy przypadkowo nie zmieni wybranego elementu!
       const isHeadingRight = this.hasBeenInLeftZone && clientX >= width * 0.35;
       if (isHeadingRight) {
         this.isTransitionLocked = true;
         const distToCommitX = Math.max(0, Math.round(rightThreshold - clientX));
+        this.drumLeft.setZoom(1.0);
         this.drumLeft.updateGauge(0, 'center', true, distToCommitX, 'SKĄD');
         this.updatePuckCallout(`🔒 ZABLOKOWANE (${distToCommitX}px do SKĄD)`, true);
         this.updateTransitionBadge(`➔ ${distToCommitX}px`);
@@ -307,44 +308,32 @@ export class GestureEngine {
         this.anchorIndex = this.drumLeft.selectedIndex;
       }
 
-      // Dwubiegowa lewa kolumna: Pas Szybki (0 - 16%) i Pas Precyzyjny (16% - 47%)
-      const newLane = clientX <= width * 0.16 ? 'turbo' : 'precision';
+      // Dynamiczny zoom kafelka na osi X: od lewej krawędzi (mini/szybki) do środka (duży kafelek/precyzyjny)
+      const minX = width * 0.04;
+      const maxX = width * 0.34;
+      const currentZoom = Math.max(0, Math.min(1, (clientX - minX) / (maxX - minX)));
+      this.currentZoom = currentZoom;
+      this.drumLeft.setZoom(currentZoom);
 
-      // KRYTYCZNY DETAL: Płynne przejście między biegami bez przeskoku
-      if (newLane !== this.currentLane) {
-        this.currentLane = newLane;
-        this.anchorY = clientY;
+      // Płynna kompensacja kotwicy przy zmianie skali, aby wybrany element nie przeskakiwał na osi Y
+      if (Math.abs(currentZoom - this.lastZoom) > 0.035) {
         this.anchorIndex = this.drumLeft.selectedIndex;
-        this.drumLeft.setLane(newLane);
+        this.anchorY = clientY;
+        this.lastZoom = currentZoom;
       }
 
+      // Skok w px zależny od zoomu: 18px (szybki) do 42px (duży kafelek)
+      const stepPx = Math.round(18 + currentZoom * 24);
       const deltaY = clientY - this.anchorY;
-
-      let deltaIndex = 0;
-      let fraction = 0;
-      let distPx = 14;
-      let direction = 'center';
-
-      if (this.currentLane === 'turbo') {
-        // Pas Szybki: 1 krok co 20px przesuwa o 8 pozycji naraz
-        deltaIndex = Math.round(-deltaY / 20) * 8;
-        const remainder = Math.abs(deltaY) % 20;
-        distPx = Math.max(1, Math.round(10 - Math.abs(10 - remainder)));
-        direction = deltaY < -2 ? 'up' : (deltaY > 2 ? 'down' : 'center');
-        fraction = 0;
-      } else {
-        // Pas Precyzyjny: 1 krok co 28px przesuwa dokładnie o 1 pozycję
-        const floatOffset = -deltaY / 28;
-        deltaIndex = Math.round(floatOffset);
-        fraction = floatOffset - deltaIndex; // w zakresie [-0.5, 0.5]
-        distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * 28));
-        direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
-      }
+      const floatOffset = -deltaY / stepPx;
+      const deltaIndex = Math.round(floatOffset);
+      let fraction = floatOffset - deltaIndex;
+      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * stepPx));
+      const direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
 
       let targetIndex = this.anchorIndex + deltaIndex;
       const totalItems = this.cachedData.coList.length;
 
-      // Zapobieganie opóźnieniu przy nawrocie po uderzeniu w krawędź listy
       if (targetIndex < 0) {
         targetIndex = 0;
         this.anchorIndex = 0;
@@ -359,15 +348,15 @@ export class GestureEngine {
 
       const changed = this.drumLeft.setSelectedIndex(targetIndex, fraction);
       if (changed) {
-        feedback.tick(this.currentLane === 'turbo');
+        feedback.tick(currentZoom < 0.35);
         this.updatePreviewUI();
       }
 
       this.drumLeft.updateGauge(distPx, direction, false);
-      if (this.currentLane === 'turbo') {
-        this.updatePuckCallout(`⚡ TURBO x8 • ${direction === 'up' ? '▲' : (direction === 'down' ? '▼' : '●')}`);
+      if (currentZoom < 0.35) {
+        this.updatePuckCallout(`⚡ SZYBKO (zoom ${Math.round(currentZoom * 100)}%)`);
       } else if (direction === 'center') {
-        this.updatePuckCallout('● STABILNE (14px do zmiany)');
+        this.updatePuckCallout(`● PRECYZJA (${distPx}px do zmiany)`);
       } else if (direction === 'up') {
         this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
       } else {
@@ -379,6 +368,7 @@ export class GestureEngine {
       if (isHeadingLeft) {
         this.isTransitionLocked = true;
         const distToCommitX = Math.max(0, Math.round(clientX - leftThreshold));
+        this.drumRight.setZoom(1.0);
         this.drumRight.updateGauge(0, 'center', true, distToCommitX, 'DOKĄD');
         this.updatePuckCallout(`🔒 ZABLOKOWANE (${distToCommitX}px do DOKĄD)`, true);
         this.updateTransitionBadge(`◀ ${distToCommitX}px`);
@@ -392,12 +382,26 @@ export class GestureEngine {
         this.anchorIndex = this.drumRight.selectedIndex;
       }
 
-      // Krok 2 (SKĄD - Prawa kolumna, 28px / krok)
+      // Prawa strona: od prawej krawędzi (mini) do środka (duży kafelek)
+      const minX = width * 0.66;
+      const maxX = width * 0.96;
+      const currentZoom = Math.max(0, Math.min(1, (maxX - clientX) / (maxX - minX)));
+      this.currentZoom = currentZoom;
+      this.drumRight.setZoom(currentZoom);
+
+      if (Math.abs(currentZoom - this.lastZoom) > 0.035) {
+        this.anchorIndex = this.drumRight.selectedIndex;
+        this.anchorY = clientY;
+        this.lastZoom = currentZoom;
+      }
+
+      // Krok 2 (SKĄD - Prawa kolumna, stepPx zależne od zoomu)
+      const stepPx = Math.round(18 + currentZoom * 24);
       const deltaY = clientY - this.anchorY;
-      const floatOffset = -deltaY / 28;
+      const floatOffset = -deltaY / stepPx;
       const deltaIndex = Math.round(floatOffset);
       let fraction = floatOffset - deltaIndex;
-      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * 28));
+      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * stepPx));
       const direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
 
       let targetIndex = this.anchorIndex + deltaIndex;
@@ -417,13 +421,15 @@ export class GestureEngine {
 
       const changed = this.drumRight.setSelectedIndex(targetIndex, fraction);
       if (changed) {
-        feedback.tick(false);
+        feedback.tick(currentZoom < 0.35);
         this.updatePreviewUI();
       }
 
       this.drumRight.updateGauge(distPx, direction, false);
-      if (direction === 'center') {
-        this.updatePuckCallout('● STABILNE (14px do zmiany)');
+      if (currentZoom < 0.35) {
+        this.updatePuckCallout(`⚡ SZYBKO (zoom ${Math.round(currentZoom * 100)}%)`);
+      } else if (direction === 'center') {
+        this.updatePuckCallout(`● PRECYZJA (${distPx}px do zmiany)`);
       } else if (direction === 'up') {
         this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
       } else {
@@ -435,6 +441,7 @@ export class GestureEngine {
       if (isHeadingRight) {
         this.isTransitionLocked = true;
         const distToCommitX = Math.max(0, Math.round(rightThreshold - clientX));
+        this.drumLeft.setZoom(1.0);
         this.drumLeft.updateGauge(0, 'center', true, distToCommitX, 'ILE');
         this.updatePuckCallout(`🔒 ZABLOKOWANE (${distToCommitX}px do ILE)`, true);
         this.updateTransitionBadge(`➔ ${distToCommitX}px`);
@@ -448,12 +455,26 @@ export class GestureEngine {
         this.anchorIndex = this.drumLeft.selectedIndex;
       }
 
-      // Krok 3 (DOKĄD - Lewa kolumna, 28px / krok)
+      // Lewa strona: zoom od krawędzi do środka
+      const minX = width * 0.04;
+      const maxX = width * 0.34;
+      const currentZoom = Math.max(0, Math.min(1, (clientX - minX) / (maxX - minX)));
+      this.currentZoom = currentZoom;
+      this.drumLeft.setZoom(currentZoom);
+
+      if (Math.abs(currentZoom - this.lastZoom) > 0.035) {
+        this.anchorIndex = this.drumLeft.selectedIndex;
+        this.anchorY = clientY;
+        this.lastZoom = currentZoom;
+      }
+
+      // Krok 3 (DOKĄD - Lewa kolumna, stepPx zależne od zoomu)
+      const stepPx = Math.round(18 + currentZoom * 24);
       const deltaY = clientY - this.anchorY;
-      const floatOffset = -deltaY / 28;
+      const floatOffset = -deltaY / stepPx;
       const deltaIndex = Math.round(floatOffset);
       let fraction = floatOffset - deltaIndex;
-      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * 28));
+      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * stepPx));
       const direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
 
       let targetIndex = this.anchorIndex + deltaIndex;
@@ -473,13 +494,15 @@ export class GestureEngine {
 
       const changed = this.drumLeft.setSelectedIndex(targetIndex, fraction);
       if (changed) {
-        feedback.tick(false);
+        feedback.tick(currentZoom < 0.35);
         this.updatePreviewUI();
       }
 
       this.drumLeft.updateGauge(distPx, direction, false);
-      if (direction === 'center') {
-        this.updatePuckCallout('● STABILNE (14px do zmiany)');
+      if (currentZoom < 0.35) {
+        this.updatePuckCallout(`⚡ SZYBKO (zoom ${Math.round(currentZoom * 100)}%)`);
+      } else if (direction === 'center') {
+        this.updatePuckCallout(`● PRECYZJA (${distPx}px do zmiany)`);
       } else if (direction === 'up') {
         this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
       } else {
@@ -491,12 +514,26 @@ export class GestureEngine {
         this.clearTransitionBadge();
       }
 
-      // Krok 4 (ILE - Prawa kolumna, 28px / krok)
+      // Prawa strona: zoom od krawędzi do środka
+      const minX = width * 0.66;
+      const maxX = width * 0.96;
+      const currentZoom = Math.max(0, Math.min(1, (maxX - clientX) / (maxX - minX)));
+      this.currentZoom = currentZoom;
+      this.drumRight.setZoom(currentZoom);
+
+      if (Math.abs(currentZoom - this.lastZoom) > 0.035) {
+        this.anchorIndex = this.drumRight.selectedIndex;
+        this.anchorY = clientY;
+        this.lastZoom = currentZoom;
+      }
+
+      // Krok 4 (ILE - Prawa kolumna, stepPx zależne od zoomu)
+      const stepPx = Math.round(18 + currentZoom * 24);
       const deltaY = clientY - this.anchorY;
-      const floatOffset = -deltaY / 28;
+      const floatOffset = -deltaY / stepPx;
       const deltaIndex = Math.round(floatOffset);
       let fraction = floatOffset - deltaIndex;
-      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * 28));
+      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * stepPx));
       const direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
 
       let targetIndex = this.anchorIndex + deltaIndex;
@@ -516,13 +553,15 @@ export class GestureEngine {
 
       const changed = this.drumRight.setSelectedIndex(targetIndex, fraction);
       if (changed) {
-        feedback.tick(false);
+        feedback.tick(currentZoom < 0.35);
         this.updatePreviewUI();
       }
 
       this.drumRight.updateGauge(distPx, direction, false);
-      if (direction === 'center') {
-        this.updatePuckCallout('● STABILNE (Puść aby zapisać)');
+      if (currentZoom < 0.35) {
+        this.updatePuckCallout(`⚡ SZYBKO (zoom ${Math.round(currentZoom * 100)}%)`);
+      } else if (direction === 'center') {
+        this.updatePuckCallout('● PRECYZJA (Puść aby zapisać)');
       } else if (direction === 'up') {
         this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
       } else {

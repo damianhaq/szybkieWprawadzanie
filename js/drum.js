@@ -1,4 +1,4 @@
-// Renderer bębnów wyboru (Cylindrical 3D Picker Wheel) dla lewej i prawej kolumny
+// Renderer bębnów wyboru (Cylindrical 3D Picker Wheel) z kafelkami i dynamicznym zoomem 2D
 
 export class DrumColumn {
   constructor(containerEl, side = 'left') {
@@ -10,19 +10,19 @@ export class DrumColumn {
     this.stepTitle = '';
     this.stepSubtitle = '';
     this.isActive = false;
-    this.lane = 'precision'; // 'precision' | 'turbo'
+    this.zoom = 1.0; // 0.0 (kompaktowy/szybki) do 1.0 (duży kafelek/precyzyjny)
 
     this.headerEl = this.container.querySelector('.column-header');
     this.titleEl = this.container.querySelector('.column-title');
     this.badgeEl = this.container.querySelector('.column-step-badge');
     this.wheelEl = this.container.querySelector('.wheel-track');
     this.targetWindowEl = this.container.querySelector('.target-window');
-    this.laneIndicatorEl = this.container.querySelector('.lane-indicator');
+    this.zoomIndicatorEl = this.container.querySelector('.zoom-indicator');
     this.gaugeEl = this.container.querySelector('.target-gauge-indicator');
 
     // Zakres widocznych pozycji w bębnie (np. 5 w górę, 5 w dół)
     this.visibleSpan = 5;
-    this.itemHeight = 52; // Bazowa wysokość slotu w px (zgodna z --slot-height: 52px)
+    this.itemHeight = 54; // Dynamiczna wysokość slotu w px zależna od zoomu
     this.fraction = 0;
   }
 
@@ -35,10 +35,6 @@ export class DrumColumn {
     this.selectedIndex = Math.max(0, Math.min(initialIndex, this.items.length - 1));
     this.fraction = 0;
 
-    if (this.targetWindowEl && this.targetWindowEl.offsetHeight > 0) {
-      this.itemHeight = this.targetWindowEl.offsetHeight;
-    }
-
     if (this.titleEl) {
       this.titleEl.textContent = title;
     }
@@ -46,6 +42,7 @@ export class DrumColumn {
       this.badgeEl.textContent = `KROK ${stepNumber}`;
     }
 
+    this.updateZoomIndicator();
     this.render(0);
     this.resetGauge();
   }
@@ -55,6 +52,7 @@ export class DrumColumn {
     if (isActive) {
       this.container.classList.add('column-active');
       this.container.classList.remove('column-dimmed');
+      this.updateZoomIndicator();
       this.resetGauge();
     } else {
       this.container.classList.remove('column-active');
@@ -62,31 +60,44 @@ export class DrumColumn {
     }
   }
 
-  setLane(lane) {
-    this.lane = lane;
-    if (this.laneIndicatorEl) {
-      if (lane === 'turbo') {
-        const item = this.getSelectedItem();
-        const text = typeof item === 'object' ? item.text : (item || '');
-        const letter = text ? text.charAt(0).toUpperCase() : '';
-        const letterBadge = letter ? ` [${letter}]` : '';
-        this.laneIndicatorEl.textContent = `⚡ TRYB SZYBKI (x8)${letterBadge}`;
-        this.laneIndicatorEl.className = 'lane-indicator lane-turbo active';
-        this.container.classList.add('in-turbo-lane');
-      } else {
-        this.laneIndicatorEl.textContent = '🎯 PRECYZJA (x1)';
-        this.laneIndicatorEl.className = 'lane-indicator lane-precision active';
-        this.container.classList.remove('in-turbo-lane');
+  // Płynna zmiana powiększenia kafelków na osi X (Zoom Gestem)
+  setZoom(zoom) {
+    const clamped = Math.max(0, Math.min(1, zoom));
+    if (Math.abs(clamped - this.zoom) > 0.015) {
+      this.zoom = clamped;
+      // Wysokość kafelka skaluje się od 36px (mini) do 58px (duży)
+      this.itemHeight = Math.round(36 + this.zoom * 22);
+
+      if (this.targetWindowEl) {
+        this.targetWindowEl.style.height = `${this.itemHeight}px`;
       }
+      if (this.wheelEl) {
+        this.wheelEl.style.height = `${this.itemHeight}px`;
+      }
+
+      this.container.classList.toggle('zoom-compact', this.zoom < 0.45);
+      this.updateZoomIndicator();
+      this.render(this.fraction);
     }
   }
 
-  hideLaneIndicator() {
-    if (this.laneIndicatorEl) {
-      this.laneIndicatorEl.className = 'lane-indicator hidden';
-      this.container.classList.remove('in-turbo-lane');
+  updateZoomIndicator() {
+    if (!this.zoomIndicatorEl) return;
+    if (this.zoom >= 0.7) {
+      this.zoomIndicatorEl.textContent = '🔍 100% PRECYZJA';
+      this.zoomIndicatorEl.className = 'zoom-indicator zoom-precise';
+    } else if (this.zoom <= 0.35) {
+      this.zoomIndicatorEl.textContent = '⚡ SZYBKI PODGLĄD';
+      this.zoomIndicatorEl.className = 'zoom-indicator zoom-fast';
+    } else {
+      this.zoomIndicatorEl.textContent = `🔍 ZOOM ${Math.round(this.zoom * 100)}%`;
+      this.zoomIndicatorEl.className = 'zoom-indicator';
     }
   }
+
+  // Kompatybilność wsteczna
+  setLane() {}
+  hideLaneIndicator() {}
 
   setSelectedIndex(index, fraction = 0) {
     const clamped = Math.max(0, Math.min(index, this.items.length - 1));
@@ -94,13 +105,6 @@ export class DrumColumn {
     this.selectedIndex = clamped;
     this.fraction = fraction;
     this.render(fraction);
-    if (this.lane === 'turbo' && this.laneIndicatorEl) {
-      const item = this.getSelectedItem();
-      const text = typeof item === 'object' ? item.text : (item || '');
-      const letter = text ? text.charAt(0).toUpperCase() : '';
-      const letterBadge = letter ? ` [${letter}]` : '';
-      this.laneIndicatorEl.textContent = `⚡ TRYB SZYBKI (x8)${letterBadge}`;
-    }
     return indexChanged;
   }
 
@@ -127,10 +131,11 @@ export class DrumColumn {
     this.container.classList.remove('transition-locked');
 
     if (direction === 'center') {
+      const info = this.zoom < 0.35 ? 'Szybki podgląd' : `${distancePx}px do zmiany`;
       this.gaugeEl.innerHTML = `
         <span class="gauge-pill gauge-stable">
           <span class="gauge-dot"></span>
-          STABILNE (${distancePx}px do zmiany)
+          STABILNE (${info})
         </span>
       `;
     } else if (direction === 'up') {
@@ -158,7 +163,7 @@ export class DrumColumn {
     this.gaugeEl.innerHTML = `
       <span class="gauge-pill gauge-stable">
         <span class="gauge-dot"></span>
-        STABILNE (14px do zmiany)
+        STABILNE (18px do zmiany)
       </span>
     `;
     this.container.classList.remove('transition-locked');
@@ -202,7 +207,8 @@ export class DrumColumn {
       const angle = visualDiff * 14; // łagodny kąt obrotu walca
       const translateY = visualDiff * this.itemHeight;
       const translateZ = -Math.abs(visualDiff) * 16;
-      const scale = Math.max(0.72, 1 - Math.abs(visualDiff) * 0.07);
+      const baseScale = 0.82 + this.zoom * 0.22;
+      const scale = Math.max(0.68, baseScale - Math.abs(visualDiff) * 0.06);
       const opacity = isSelected && fraction === 0 ? 1 : Math.max(0.12, 0.90 - Math.abs(visualDiff) * 0.25);
 
       itemDiv.style.transform = `translate3d(0px, ${translateY}px, ${translateZ}px) rotateX(${-angle}deg) scale(${scale})`;
@@ -231,9 +237,9 @@ export class DrumColumn {
       const topFlameHtml = isTop ? `<span class="top-flame-icon" title="Czołówka TOP (${count}x)">🔥</span>` : '';
 
       itemDiv.innerHTML = `
-        <div class="item-content ${isTop ? 'has-top-badge' : ''}">
+        <div class="drum-card ${isTop ? 'card-top' : ''}">
           ${topFlameHtml}
-          <div class="item-text-box">
+          <div class="card-text-box">
             ${categoryHtml}
             ${titleHtml}
           </div>

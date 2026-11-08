@@ -315,60 +315,6 @@ html, body {
   touch-action: none;
 }
 
-/* PAS SZYBKI (TURBO) W KROKU 1: 0% - 16% szerokości */
-.turbo-lane-stripe {
-  position: absolute;
-  top: 52px;
-  bottom: 0;
-  left: 0;
-  width: 16%;
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(245, 158, 11, 0.015),
-    rgba(245, 158, 11, 0.015) 10px,
-    rgba(245, 158, 11, 0.04) 10px,
-    rgba(245, 158, 11, 0.04) 20px
-  );
-  border-right: 1px dashed rgba(245, 158, 11, 0.25);
-  border-left: 3px solid rgba(245, 158, 11, 0.35);
-  pointer-events: none;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  align-items: flex-start;
-  opacity: 0.75;
-  transition: opacity 0.25s ease, background 0.2s ease, border-color 0.2s ease;
-}
-
-.turbo-lane-stripe.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.turbo-lane-tag {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  font-size: 9.5px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: var(--amber-primary);
-  background: rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(245, 158, 11, 0.6);
-  border-radius: 4px;
-  padding: 2px 5px;
-  pointer-events: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-}
-
-.in-turbo-lane .turbo-lane-stripe {
-  opacity: 1;
-  background: rgba(245, 158, 11, 0.08);
-  border-left: 4px solid var(--amber-primary);
-  box-shadow: inset 8px 0 16px rgba(245, 158, 11, 0.12);
-}
-
 /* KOLUMNY: LEWA (0% - 50%) i PRAWA (50% - 100%) */
 .drum-column {
   flex: 1;
@@ -431,30 +377,42 @@ html, body {
   color: #000;
 }
 
-.lane-indicator {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 6px;
+.zoom-indicator {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 7px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-dim);
+  transition: all 0.15s ease;
+  user-select: none;
+  opacity: 0.45;
 }
 
-.lane-indicator.hidden {
-  display: none;
+.column-active .zoom-indicator {
+  opacity: 1;
+  border-color: var(--amber-primary);
+  color: var(--amber-primary);
+  background: rgba(245, 158, 11, 0.15);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
 }
 
-.lane-indicator.lane-turbo {
-  background: var(--amber-primary);
-  color: #000;
-  box-shadow: 0 0 10px var(--amber-glow);
+.zoom-indicator.zoom-fast {
+  border-color: #38bdf8;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
 }
 
-.lane-indicator.lane-precision {
-  background: var(--bg-card);
-  color: var(--cyan-primary);
-  border: 1px solid var(--border-cyan);
+.zoom-indicator.zoom-precise {
+  border-color: var(--emerald-primary);
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
 }
 
 .column-title {
@@ -486,7 +444,7 @@ html, body {
   height: var(--slot-height);
   transform: translateY(-50%);
   border: 2px solid var(--border-subtle);
-  border-radius: 8px;
+  border-radius: 12px;
   pointer-events: none;
   z-index: 5;
   background: rgba(15, 23, 42, 0.5);
@@ -495,7 +453,7 @@ html, body {
   justify-content: space-between;
   padding: 0 6px;
   box-sizing: border-box;
-  transition: all 0.2s ease;
+  transition: height 0.12s ease-out, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .column-active .target-window {
@@ -605,14 +563,15 @@ html, body {
   pointer-events: none;
   z-index: 10;
   box-sizing: border-box;
+  transition: height 0.12s ease-out;
 }
 
 .wheel-item {
   position: absolute;
   top: 0;
-  left: 6px;
-  right: 6px;
-  height: var(--slot-height);
+  left: 4px;
+  right: 4px;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -622,19 +581,42 @@ html, body {
   box-sizing: border-box;
 }
 
-.item-content {
+/* KAFELEK BĘBNA (DRUM CARD) */
+.drum-card {
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 10px;
-  border-radius: 6px;
-  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.72) 0%, rgba(15, 23, 42, 0.9) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  gap: 8px;
   box-sizing: border-box;
+  overflow: hidden;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.item-text-box {
+.wheel-item.selected .drum-card {
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.45) 0%, rgba(15, 23, 42, 0.95) 100%);
+  border-color: var(--amber-primary);
+  box-shadow: 0 0 16px var(--amber-glow), 0 3px 12px rgba(0, 0, 0, 0.6);
+}
+
+.drum-column.transition-locked .wheel-item.selected .drum-card {
+  background: linear-gradient(135deg, rgba(8, 51, 68, 0.6) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+  border-color: var(--cyan-primary) !important;
+  box-shadow: 0 0 20px var(--cyan-glow), inset 0 0 10px rgba(6, 182, 212, 0.25) !important;
+}
+
+.drum-card.card-top {
+  border-left: 3px solid #f97316;
+}
+
+.card-text-box {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -642,6 +624,7 @@ html, body {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
+  line-height: 1.2;
 }
 
 .item-cat {
@@ -655,6 +638,7 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  margin-bottom: 1px;
 }
 
 .item-title {
@@ -688,6 +672,26 @@ html, body {
   font-size: 13px;
   flex-shrink: 0;
   line-height: 1;
+}
+
+/* W trybie kompaktowym (zoom < 0.45): jednolinijkowy miniaturowy kafelek do błyskawicznego przeglądania */
+.drum-column.zoom-compact .drum-card {
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.drum-column.zoom-compact .item-cat {
+  display: none;
+}
+
+.drum-column.zoom-compact .item-title {
+  -webkit-line-clamp: 1;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.drum-column.zoom-compact .wheel-item.selected .item-title {
+  font-size: 11.5px;
 }
 
 .wheel-empty {

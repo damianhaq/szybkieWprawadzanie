@@ -50,35 +50,47 @@ const statsAfter = sm.getStats();
 console.assert(statsAfter['Paleta EURO 1200x800'] === 35, `Licznik dla Paleta EURO powinien wzrosnąć z 34 do 35, wynosi: ${statsAfter['Paleta EURO 1200x800']}`);
 console.log('✓ Licznik użyć zwiększony do 35');
 
-console.log('--- TEST 5: Matematyka względnego przewijania i pasów prędkości ---');
+console.log('--- TEST 5: Matematyka dynamicznego zoomu 2D kafelków i płynnej prędkości przewijania ---');
 // Symulacja ekranu o szerokości 400px
 const screenWidth = 400;
-const turboThreshold = screenWidth * 0.16; // 64px
 const leftThreshold = screenWidth * 0.47;  // 188px
 const rightThreshold = screenWidth * 0.53; // 212px
 
-// Test pasa szybkiego (X <= 16% szerokości)
-const isFast1 = 50 <= turboThreshold;
-const isFast2 = 100 <= turboThreshold;
-console.assert(isFast1 === true, 'X=50px powinno być w Pasie Szybkim');
-console.assert(isFast2 === false, 'X=100px powinno być w Pasie Precyzyjnym');
+// Obliczanie zoomu w lewej kolumnie (X od 4% = 16px do 34% = 136px)
+const calcLeftZoom = (x) => Math.max(0, Math.min(1, (x - screenWidth * 0.04) / (screenWidth * 0.30)));
+const zoomOuter = calcLeftZoom(16); // przy samej lewej krawędzi
+const zoomMid = calcLeftZoom(76);   // w połowie kolumny
+const zoomInner = calcLeftZoom(136); // przy strefie zatwierdzenia
 
-// W Pasie Szybkim: 1 krok co 20px przesuwa o 8 pozycji
-const turboDeltaY = -40; // Przesunięcie palcem w górę o 40px
-const turboDeltaIndex = Math.round(-turboDeltaY / 20) * 8; // (-(-40)/20)*8 = 2 * 8 = 16 pozycji!
-console.assert(turboDeltaIndex === 16, `Przesunięcie 40px w pasie turbo powinno dać 16 pozycji, dało: ${turboDeltaIndex}`);
+console.assert(zoomOuter === 0, `Zoom przy krawędzi powinien wynosić 0.0, wynosi: ${zoomOuter}`);
+console.assert(Math.abs(zoomMid - 0.5) < 0.01, `Zoom w połowie kolumny powinien wynosić ~0.5, wynosi: ${zoomMid}`);
+console.assert(zoomInner === 1.0, `Zoom blisko środka powinien wynosić 1.0, wynosi: ${zoomInner}`);
 
-// W Pasie Precyzyjnym: 1 krok co 28px przesuwa dokładnie o 1 pozycję
-const precDeltaY = -56; // Przesunięcie w górę o 56px
-const precDeltaIndex = Math.round(-precDeltaY / 28); // 2 pozycje
-console.assert(precDeltaIndex === 2, `Przesunięcie 56px w pasie precyzyjnym powinno dać 2 pozycje, dało: ${precDeltaIndex}`);
+// Zależność stepPx (skoku w pionie) od zoomu: stepPx = 18 + zoom * 24
+const stepPxOuter = Math.round(18 + zoomOuter * 24); // 18px (szybki tryb)
+const stepPxInner = Math.round(18 + zoomInner * 24); // 42px (duży kafelek, precyzja)
+console.assert(stepPxOuter === 18, `W trybie mini stepPx powinno wynosić 18px, wynosi: ${stepPxOuter}`);
+console.assert(stepPxInner === 42, `W trybie powiększonym stepPx powinno wynosić 42px, wynosi: ${stepPxInner}`);
+
+// Porównanie prędkości przewijania przy ruchu 84px w pionie:
+const deltaY = -84;
+const itemsMovedOuter = Math.round(-deltaY / stepPxOuter); // 84 / 18 = 4.67 -> 5 pozycji
+const itemsMovedInner = Math.round(-deltaY / stepPxInner); // 84 / 42 = 2 pozycje
+console.assert(itemsMovedOuter === 5, `W trybie mini ruch 84px powinien przesunąć 5 kafelków, przesunął: ${itemsMovedOuter}`);
+console.assert(itemsMovedInner === 2, `W trybie powiększonym ten sam ruch 84px powinien przesunąć tylko 2 kafelki, przesunął: ${itemsMovedInner}`);
+
+// Dynamiczna wysokość kafelka: 36px (mini) do 58px (duży)
+const cardHeightOuter = Math.round(36 + zoomOuter * 22);
+const cardHeightInner = Math.round(36 + zoomInner * 22);
+console.assert(cardHeightOuter === 36, `Wysokość kafelka mini powinna wynosić 36px, wynosi: ${cardHeightOuter}`);
+console.assert(cardHeightInner === 58, `Wysokość kafelka powiększonego powinna wynosić 58px, wynosi: ${cardHeightInner}`);
 
 // Test strefy martwej / histerezy
 const inDeadZone = (x) => x > leftThreshold && x < rightThreshold;
 console.assert(inDeadZone(200) === true, 'X=200px powinno leżeć w strefie martwej (188px - 212px)');
 console.assert(inDeadZone(180) === false, 'X=180px to lewa strefa');
 console.assert(inDeadZone(220) === false, 'X=220px to prawa strefa');
-console.log('✓ Matematyka pasów, przewijania i strefy martwej w 100% poprawna');
+console.log('✓ Dynamiczny zoom 2D, skala kafelków i płynna prędkość w 100% poprawne');
 
 console.log('--- TEST 6: Matematyka wskaźnika dystansu (HUD) i blokady korytarza przejścia ---');
 // Wskaźnik mikrodystansu (28px na slot)

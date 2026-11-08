@@ -54,17 +54,12 @@
 
     <!-- 2. GŁÓWNY OBSZAR GESTÓW (GESTURE PAD - ~63%) -->
     <main class="gesture-pad" id="gesturePad">
-      <!-- Wskaźnik pasa szybkiego (Turbo) w Kroku 1 (0% - 16%) - bez uciążliwego tekstu pionowego -->
-      <div class="turbo-lane-stripe" id="turboLaneStripe">
-        <div class="turbo-lane-tag">⚡ x8</div>
-      </div>
-
       <!-- LEWA STREFA (0% - 50% szerokości) -->
       <section class="drum-column" id="columnLeft">
         <div class="column-header">
           <div class="header-top-row">
             <span class="column-step-badge">KROK 1</span>
-            <span class="lane-indicator hidden">🎯 PRECYZJA (x1)</span>
+            <span class="zoom-indicator">🔍 100% PRECYZJA</span>
           </div>
           <div class="column-title">1. WYBIERZ TOWAR (CO)</div>
         </div>
@@ -95,7 +90,7 @@
         <div class="column-header">
           <div class="header-top-row">
             <span class="column-step-badge">KROK 2</span>
-            <span class="lane-indicator hidden">🎯 PRECYZJA (x1)</span>
+            <span class="zoom-indicator">🔍 100% PRECYZJA</span>
           </div>
           <div class="column-title">2. LOKALIZACJA (SKĄD)</div>
         </div>
@@ -115,9 +110,9 @@
         <div class="puck-distance-callout" id="puckDistanceCallout"></div>
       </div>
 
-      <!-- Pasek podpowiedzi -->
+      <!-- Pasek podpowiedzi z informacją o dynamicznym zoomie kafelków -->
       <div class="gesture-footer-hint">
-        Przesuwaj góra/dół • Przekraczaj środek ekranu • Puść w dowolnej chwili aby zapisać
+        ← Zewnętrzna krawędź: szybki podgląd | Środek ekranu: duży kafelek i zatwierdzenie →
       </div>
     </main>
 
