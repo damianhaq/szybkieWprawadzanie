@@ -10,6 +10,8 @@ export class GestureEngine {
     this.drumRight = options.drumRight;
     this.previewEl = options.previewEl;
     this.pointerPuckEl = options.pointerPuckEl;
+    this.puckCalloutEl = document.getElementById('puckDistanceCallout');
+    this.transitionDistanceBadge = document.getElementById('transitionDistanceBadge');
     this.turboStripeEl = document.getElementById('turboLaneStripe');
     this.onTaskSaved = options.onTaskSaved || (() => {});
     this.onTaskCancelled = options.onTaskCancelled || (() => {});
@@ -20,6 +22,7 @@ export class GestureEngine {
     this.currentStep = 1; // 1: CO (L), 2: SKĄD (P), 3: DOKĄD (L), 4: ILE (P)
     this.currentLane = 'precision'; // 'precision' | 'turbo' (dla Kroku 1)
     this.isInCancelZone = false;
+    this.isTransitionLocked = false; // Blokada korytarza przejścia w bok przed przypadkową zmianą pozycji
 
     // Kotwice przewijania relatywnego (Relative Scrolling)
     this.anchorY = 0;
@@ -63,7 +66,11 @@ export class GestureEngine {
     this.currentStep = 1;
     this.currentLane = 'precision';
     this.isInCancelZone = false;
+    this.isTransitionLocked = false;
     this.taskDraft = { co: null, skad: null, dokad: null, ile: null };
+
+    this.clearTransitionBadge();
+    this.hidePuckCallout();
 
     // Pas Turbo widoczny w Kroku 1
     if (this.turboStripeEl) {
@@ -141,6 +148,8 @@ export class GestureEngine {
     // Kotwica startowa dla relatywnego przewijania
     this.anchorY = clientY;
     this.anchorIndex = this.drumLeft.selectedIndex;
+    this.isTransitionLocked = false;
+    this.clearTransitionBadge();
 
     this.showPointerPuck(clientX, clientY);
     this.updatePreviewUI();
@@ -169,6 +178,7 @@ export class GestureEngine {
         this.topBarEl.classList.add('cancel-zone-active');
         feedback.cancelZoneEntered();
         this.updatePreviewUI(true);
+        this.updatePuckCallout('⚠️ ANULUJ ZADANIE', true);
       }
       return; // W strefie anulowania nie przewijamy list
     } else {
@@ -176,6 +186,7 @@ export class GestureEngine {
         this.isInCancelZone = false;
         this.topBarEl.classList.remove('cancel-zone-active');
         this.updatePreviewUI(false);
+        this.anchorY = clientY; // Zapobiega skokowi po opuszczeniu strefy anulowania
       }
     }
 
@@ -189,6 +200,8 @@ export class GestureEngine {
 
     // A. KROK 1 -> KROK 2 (Z LEWEJ DO PRAWEJ)
     if (this.currentStep === 1 && this.hasBeenInLeftZone && clientX >= rightThreshold) {
+      this.isTransitionLocked = false;
+      this.clearTransitionBadge();
       const selectedItem = this.drumLeft.getSelectedItem();
       this.taskDraft.co = selectedItem ? selectedItem.text : '';
 
@@ -213,6 +226,7 @@ export class GestureEngine {
 
       // Prawa strefa staje się aktywna (KROK 2: SKĄD)
       this.drumRight.setActive(true);
+      this.drumRight.resetGauge();
       this.anchorY = clientY;
       this.anchorIndex = this.drumRight.selectedIndex;
 
@@ -222,6 +236,8 @@ export class GestureEngine {
 
     // B. KROK 2 -> KROK 3 (Z PRAWEJ DO LEWEJ)
     if (this.currentStep === 2 && clientX <= leftThreshold) {
+      this.isTransitionLocked = false;
+      this.clearTransitionBadge();
       const selectedItem = this.drumRight.getSelectedItem();
       this.taskDraft.skad = selectedItem ? selectedItem.text : '';
 
@@ -240,6 +256,7 @@ export class GestureEngine {
 
       // Lewa strefa staje się aktywna (KROK 3: DOKĄD)
       this.drumLeft.setActive(true);
+      this.drumLeft.resetGauge();
       this.drumLeft.hideLaneIndicator();
       this.anchorY = clientY;
       this.anchorIndex = this.drumLeft.selectedIndex;
@@ -250,6 +267,8 @@ export class GestureEngine {
 
     // C. KROK 3 -> KROK 4 (Z LEWEJ DO PRAWEJ)
     if (this.currentStep === 3 && clientX >= rightThreshold) {
+      this.isTransitionLocked = false;
+      this.clearTransitionBadge();
       const selectedItem = this.drumLeft.getSelectedItem();
       this.taskDraft.dokad = selectedItem ? selectedItem.text : '';
 
@@ -258,6 +277,7 @@ export class GestureEngine {
 
       // Prawa strefa staje się aktywna (KROK 4: ILE)
       this.drumRight.setActive(true);
+      this.drumRight.resetGauge();
       this.drumLeft.setActive(false);
       this.anchorY = clientY;
       this.anchorIndex = this.drumRight.selectedIndex;
@@ -266,8 +286,27 @@ export class GestureEngine {
       return;
     }
 
-    // 3. Relatywne przewijanie aktywnej kolumny (Relative Scrolling)
+    // 3. Relatywne przewijanie aktywnej kolumny (Relative Scrolling) z blokadą korytarza przejścia
     if (this.currentStep === 1) {
+      // Jeśli palec zmierza w prawo w stronę linii środkowej, natychmiast blokujemy ruch pionowy!
+      // Dzięki temu poziomy ruch kciuka w prawo nigdy przypadkowo nie zmieni wybranego elementu!
+      const isHeadingRight = this.hasBeenInLeftZone && clientX >= width * 0.35;
+      if (isHeadingRight) {
+        this.isTransitionLocked = true;
+        const distToCommitX = Math.max(0, Math.round(rightThreshold - clientX));
+        this.drumLeft.updateGauge(0, 'center', true, distToCommitX, 'SKĄD');
+        this.updatePuckCallout(`🔒 ZABLOKOWANE (${distToCommitX}px do SKĄD)`, true);
+        this.updateTransitionBadge(`➔ ${distToCommitX}px`);
+        return;
+      }
+
+      if (this.isTransitionLocked) {
+        this.isTransitionLocked = false;
+        this.clearTransitionBadge();
+        this.anchorY = clientY;
+        this.anchorIndex = this.drumLeft.selectedIndex;
+      }
+
       // Dwubiegowa lewa kolumna: Pas Szybki (0 - 16%) i Pas Precyzyjny (16% - 47%)
       const newLane = clientX <= width * 0.16 ? 'turbo' : 'precision';
 
@@ -282,12 +321,24 @@ export class GestureEngine {
       const deltaY = clientY - this.anchorY;
 
       let deltaIndex = 0;
+      let fraction = 0;
+      let distPx = 14;
+      let direction = 'center';
+
       if (this.currentLane === 'turbo') {
         // Pas Szybki: 1 krok co 20px przesuwa o 8 pozycji naraz
         deltaIndex = Math.round(-deltaY / 20) * 8;
+        const remainder = Math.abs(deltaY) % 20;
+        distPx = Math.max(1, Math.round(10 - Math.abs(10 - remainder)));
+        direction = deltaY < -2 ? 'up' : (deltaY > 2 ? 'down' : 'center');
+        fraction = 0;
       } else {
         // Pas Precyzyjny: 1 krok co 28px przesuwa dokładnie o 1 pozycję
-        deltaIndex = Math.round(-deltaY / 28);
+        const floatOffset = -deltaY / 28;
+        deltaIndex = Math.round(floatOffset);
+        fraction = floatOffset - deltaIndex; // w zakresie [-0.5, 0.5]
+        distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * 28));
+        direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
       }
 
       let targetIndex = this.anchorIndex + deltaIndex;
@@ -298,21 +349,57 @@ export class GestureEngine {
         targetIndex = 0;
         this.anchorIndex = 0;
         this.anchorY = clientY;
+        fraction = 0;
       } else if (targetIndex >= totalItems) {
         targetIndex = totalItems - 1;
         this.anchorIndex = targetIndex;
         this.anchorY = clientY;
+        fraction = 0;
       }
 
-      const changed = this.drumLeft.setSelectedIndex(targetIndex);
+      const changed = this.drumLeft.setSelectedIndex(targetIndex, fraction);
       if (changed) {
         feedback.tick(this.currentLane === 'turbo');
         this.updatePreviewUI();
       }
+
+      this.drumLeft.updateGauge(distPx, direction, false);
+      if (this.currentLane === 'turbo') {
+        this.updatePuckCallout(`⚡ TURBO x8 • ${direction === 'up' ? '▲' : (direction === 'down' ? '▼' : '●')}`);
+      } else if (direction === 'center') {
+        this.updatePuckCallout('● STABILNE (14px do zmiany)');
+      } else if (direction === 'up') {
+        this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
+      } else {
+        this.updatePuckCallout(`▼ ${distPx}px do poprzedniego`);
+      }
     } else if (this.currentStep === 2) {
+      // Blokada korytarza powrotu w lewo do KROKU 3 (DOKĄD)
+      const isHeadingLeft = clientX <= width * 0.65;
+      if (isHeadingLeft) {
+        this.isTransitionLocked = true;
+        const distToCommitX = Math.max(0, Math.round(clientX - leftThreshold));
+        this.drumRight.updateGauge(0, 'center', true, distToCommitX, 'DOKĄD');
+        this.updatePuckCallout(`🔒 ZABLOKOWANE (${distToCommitX}px do DOKĄD)`, true);
+        this.updateTransitionBadge(`◀ ${distToCommitX}px`);
+        return;
+      }
+
+      if (this.isTransitionLocked) {
+        this.isTransitionLocked = false;
+        this.clearTransitionBadge();
+        this.anchorY = clientY;
+        this.anchorIndex = this.drumRight.selectedIndex;
+      }
+
       // Krok 2 (SKĄD - Prawa kolumna, 28px / krok)
       const deltaY = clientY - this.anchorY;
-      let deltaIndex = Math.round(-deltaY / 28);
+      const floatOffset = -deltaY / 28;
+      const deltaIndex = Math.round(floatOffset);
+      let fraction = floatOffset - deltaIndex;
+      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * 28));
+      const direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
+
       let targetIndex = this.anchorIndex + deltaIndex;
       const totalItems = this.cachedData.skadList.length;
 
@@ -320,21 +407,55 @@ export class GestureEngine {
         targetIndex = 0;
         this.anchorIndex = 0;
         this.anchorY = clientY;
+        fraction = 0;
       } else if (targetIndex >= totalItems) {
         targetIndex = totalItems - 1;
         this.anchorIndex = targetIndex;
         this.anchorY = clientY;
+        fraction = 0;
       }
 
-      const changed = this.drumRight.setSelectedIndex(targetIndex);
+      const changed = this.drumRight.setSelectedIndex(targetIndex, fraction);
       if (changed) {
         feedback.tick(false);
         this.updatePreviewUI();
       }
+
+      this.drumRight.updateGauge(distPx, direction, false);
+      if (direction === 'center') {
+        this.updatePuckCallout('● STABILNE (14px do zmiany)');
+      } else if (direction === 'up') {
+        this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
+      } else {
+        this.updatePuckCallout(`▼ ${distPx}px do poprzedniego`);
+      }
     } else if (this.currentStep === 3) {
+      // Blokada korytarza przejścia w prawo do KROKU 4 (ILE)
+      const isHeadingRight = clientX >= width * 0.35;
+      if (isHeadingRight) {
+        this.isTransitionLocked = true;
+        const distToCommitX = Math.max(0, Math.round(rightThreshold - clientX));
+        this.drumLeft.updateGauge(0, 'center', true, distToCommitX, 'ILE');
+        this.updatePuckCallout(`🔒 ZABLOKOWANE (${distToCommitX}px do ILE)`, true);
+        this.updateTransitionBadge(`➔ ${distToCommitX}px`);
+        return;
+      }
+
+      if (this.isTransitionLocked) {
+        this.isTransitionLocked = false;
+        this.clearTransitionBadge();
+        this.anchorY = clientY;
+        this.anchorIndex = this.drumLeft.selectedIndex;
+      }
+
       // Krok 3 (DOKĄD - Lewa kolumna, 28px / krok)
       const deltaY = clientY - this.anchorY;
-      let deltaIndex = Math.round(-deltaY / 28);
+      const floatOffset = -deltaY / 28;
+      const deltaIndex = Math.round(floatOffset);
+      let fraction = floatOffset - deltaIndex;
+      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * 28));
+      const direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
+
       let targetIndex = this.anchorIndex + deltaIndex;
       const totalItems = this.cachedData.dokadList.length;
 
@@ -342,21 +463,42 @@ export class GestureEngine {
         targetIndex = 0;
         this.anchorIndex = 0;
         this.anchorY = clientY;
+        fraction = 0;
       } else if (targetIndex >= totalItems) {
         targetIndex = totalItems - 1;
         this.anchorIndex = targetIndex;
         this.anchorY = clientY;
+        fraction = 0;
       }
 
-      const changed = this.drumLeft.setSelectedIndex(targetIndex);
+      const changed = this.drumLeft.setSelectedIndex(targetIndex, fraction);
       if (changed) {
         feedback.tick(false);
         this.updatePreviewUI();
       }
+
+      this.drumLeft.updateGauge(distPx, direction, false);
+      if (direction === 'center') {
+        this.updatePuckCallout('● STABILNE (14px do zmiany)');
+      } else if (direction === 'up') {
+        this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
+      } else {
+        this.updatePuckCallout(`▼ ${distPx}px do poprzedniego`);
+      }
     } else if (this.currentStep === 4) {
+      if (this.isTransitionLocked) {
+        this.isTransitionLocked = false;
+        this.clearTransitionBadge();
+      }
+
       // Krok 4 (ILE - Prawa kolumna, 28px / krok)
       const deltaY = clientY - this.anchorY;
-      let deltaIndex = Math.round(-deltaY / 28);
+      const floatOffset = -deltaY / 28;
+      const deltaIndex = Math.round(floatOffset);
+      let fraction = floatOffset - deltaIndex;
+      const distPx = Math.max(0, Math.round((0.5 - Math.abs(fraction)) * 28));
+      const direction = fraction > 0.08 ? 'up' : (fraction < -0.08 ? 'down' : 'center');
+
       let targetIndex = this.anchorIndex + deltaIndex;
       const totalItems = this.cachedData.ileList.length;
 
@@ -364,16 +506,27 @@ export class GestureEngine {
         targetIndex = 0;
         this.anchorIndex = 0;
         this.anchorY = clientY;
+        fraction = 0;
       } else if (targetIndex >= totalItems) {
         targetIndex = totalItems - 1;
         this.anchorIndex = targetIndex;
         this.anchorY = clientY;
+        fraction = 0;
       }
 
-      const changed = this.drumRight.setSelectedIndex(targetIndex);
+      const changed = this.drumRight.setSelectedIndex(targetIndex, fraction);
       if (changed) {
         feedback.tick(false);
         this.updatePreviewUI();
+      }
+
+      this.drumRight.updateGauge(distPx, direction, false);
+      if (direction === 'center') {
+        this.updatePuckCallout('● STABILNE (Puść aby zapisać)');
+      } else if (direction === 'up') {
+        this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
+      } else {
+        this.updatePuckCallout(`▼ ${distPx}px do poprzedniego`);
       }
     }
   }
@@ -387,7 +540,13 @@ export class GestureEngine {
 
     this.isDragging = false;
     this.activePointerId = null;
+    this.isTransitionLocked = false;
+    this.clearTransitionBadge();
     this.hidePointerPuck();
+    this.drumLeft.resetGauge();
+    this.drumRight.resetGauge();
+    this.drumLeft.render(0);
+    this.drumRight.render(0);
 
     // Sprawdzenie strefy anulowania
     if (this.isInCancelZone) {
@@ -435,8 +594,12 @@ export class GestureEngine {
     this.isDragging = false;
     this.activePointerId = null;
     this.isInCancelZone = false;
+    this.isTransitionLocked = false;
+    this.clearTransitionBadge();
     this.topBarEl.classList.remove('cancel-zone-active');
     this.hidePointerPuck();
+    this.drumLeft.resetGauge();
+    this.drumRight.resetGauge();
     this.resetToStep1();
   }
 
@@ -512,6 +675,35 @@ export class GestureEngine {
   hidePointerPuck() {
     if (!this.pointerPuckEl) return;
     this.pointerPuckEl.classList.remove('visible');
+    this.hidePuckCallout();
+  }
+
+  updatePuckCallout(text, isLocked = false) {
+    if (!this.puckCalloutEl) return;
+    this.puckCalloutEl.textContent = text;
+    if (isLocked) {
+      this.puckCalloutEl.classList.add('locked');
+    } else {
+      this.puckCalloutEl.classList.remove('locked');
+    }
+  }
+
+  hidePuckCallout() {
+    if (!this.puckCalloutEl) return;
+    this.puckCalloutEl.textContent = '';
+    this.puckCalloutEl.classList.remove('locked');
+  }
+
+  updateTransitionBadge(text) {
+    if (!this.transitionDistanceBadge) return;
+    this.transitionDistanceBadge.textContent = text;
+    this.transitionDistanceBadge.classList.add('visible');
+  }
+
+  clearTransitionBadge() {
+    if (!this.transitionDistanceBadge) return;
+    this.transitionDistanceBadge.textContent = '➔';
+    this.transitionDistanceBadge.classList.remove('visible');
   }
 
   escape(str) {

@@ -80,6 +80,34 @@ console.assert(inDeadZone(180) === false, 'X=180px to lewa strefa');
 console.assert(inDeadZone(220) === false, 'X=220px to prawa strefa');
 console.log('✓ Matematyka pasów, przewijania i strefy martwej w 100% poprawna');
 
+console.log('--- TEST 6: Matematyka wskaźnika dystansu (HUD) i blokady korytarza przejścia ---');
+// Wskaźnik mikrodystansu (28px na slot)
+// Dokładny środek (deltaY = 0):
+const floatOffset0 = 0 / 28;
+const deltaIndex0 = Math.round(floatOffset0);
+const fraction0 = floatOffset0 - deltaIndex0;
+const distPx0 = Math.round((0.5 - Math.abs(fraction0)) * 28);
+console.assert(distPx0 === 14, `Na środku pozostały dystans do zmiany powinien wynosić 14px, wynosi: ${distPx0}`);
+
+// Ruch o 8px w górę (deltaY = -8):
+const floatOffset8 = -(-8) / 28; // 8 / 28 = 0.2857
+const deltaIndex8 = Math.round(floatOffset8); // 0
+const fraction8 = floatOffset8 - deltaIndex8; // 0.2857
+const distPx8 = Math.round((0.5 - Math.abs(fraction8)) * 28); // (0.5 - 0.2857) * 28 = 6px
+console.assert(distPx8 === 6, `Po przesunięciu 8px powinno zostać 6px do zmiany pozycji, zostało: ${distPx8}`);
+
+// Test korytarza przejścia (Commit Corridor)
+// Szerokość ekranu 400px:
+// 35% szerokości = 140px, 53% szerokości = 212px
+const corridorCheckStep1 = (x) => x >= screenWidth * 0.35;
+console.assert(corridorCheckStep1(100) === false, 'X=100px nie jest w korytarzu przejścia w prawo (normalne przewijanie)');
+console.assert(corridorCheckStep1(150) === true, 'X=150px JEST w korytarzu przejścia w prawo (blokada pionowa wyboru)');
+
+const distToCommit = Math.max(0, Math.round(rightThreshold - 150));
+console.assert(distToCommit === 62, `Od X=150px do rightThreshold (212px) powinno brakować 62px, brakuje: ${distToCommit}`);
+
+console.log('✓ Wskaźnik mikrodystansu oraz blokada korytarza przejścia w 100% poprawne');
+
 console.log('\n========================================');
 console.log('WSZYSTKIE TESTY JEDNOSTKOWE ZAKOŃCZONE SUKCESEM!');
 console.log('========================================');

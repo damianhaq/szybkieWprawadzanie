@@ -72,6 +72,7 @@
         <div class="wheel-viewport">
           <div class="target-window">
             <span class="target-bracket-left">◀</span>
+            <div class="target-gauge-indicator"></div>
             <span class="target-bracket-right">▶</span>
           </div>
           <div class="wheel-track"></div>
@@ -81,10 +82,11 @@
       <!-- ŚRODKOWA LINIA PODZIAŁU ZE STREFĄ MARTWĄ (47% - 53%) -->
       <div class="center-divider">
         <div class="center-line-glow"></div>
-        <div class="ping-pong-arrow-hint">
+        <div class="ping-pong-arrow-hint" id="centerArrowHint">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
+          <span class="transition-distance-badge" id="transitionDistanceBadge">➔</span>
         </div>
       </div>
 
@@ -101,6 +103,7 @@
         <div class="wheel-viewport">
           <div class="target-window">
             <span class="target-bracket-left">◀</span>
+            <div class="target-gauge-indicator"></div>
             <span class="target-bracket-right">▶</span>
           </div>
           <div class="wheel-track"></div>
@@ -108,7 +111,9 @@
       </section>
 
       <!-- Płynny wskaźnik dotyku / kursor (Pointer Puck) -->
-      <div class="pointer-puck" id="pointerPuck"></div>
+      <div class="pointer-puck" id="pointerPuck">
+        <div class="puck-distance-callout" id="puckDistanceCallout"></div>
+      </div>
 
       <!-- Pasek podpowiedzi -->
       <div class="gesture-footer-hint">

@@ -18,10 +18,12 @@ export class DrumColumn {
     this.wheelEl = this.container.querySelector('.wheel-track');
     this.targetWindowEl = this.container.querySelector('.target-window');
     this.laneIndicatorEl = this.container.querySelector('.lane-indicator');
+    this.gaugeEl = this.container.querySelector('.target-gauge-indicator');
 
     // Zakres widocznych pozycji w bębnie (np. 5 w górę, 5 w dół)
     this.visibleSpan = 5;
     this.itemHeight = 52; // Bazowa wysokość slotu w px (zgodna z --slot-height: 52px)
+    this.fraction = 0;
   }
 
   // Ustawienie zawartości kolumny
@@ -31,6 +33,7 @@ export class DrumColumn {
     this.stepSubtitle = subtitle;
     this.items = items || [];
     this.selectedIndex = Math.max(0, Math.min(initialIndex, this.items.length - 1));
+    this.fraction = 0;
 
     if (this.targetWindowEl && this.targetWindowEl.offsetHeight > 0) {
       this.itemHeight = this.targetWindowEl.offsetHeight;
@@ -43,7 +46,8 @@ export class DrumColumn {
       this.badgeEl.textContent = `KROK ${stepNumber}`;
     }
 
-    this.render();
+    this.render(0);
+    this.resetGauge();
   }
 
   setActive(isActive) {
@@ -51,6 +55,7 @@ export class DrumColumn {
     if (isActive) {
       this.container.classList.add('column-active');
       this.container.classList.remove('column-dimmed');
+      this.resetGauge();
     } else {
       this.container.classList.remove('column-active');
       this.container.classList.add('column-dimmed');
@@ -83,21 +88,80 @@ export class DrumColumn {
     }
   }
 
-  setSelectedIndex(index) {
+  setSelectedIndex(index, fraction = 0) {
     const clamped = Math.max(0, Math.min(index, this.items.length - 1));
-    if (clamped !== this.selectedIndex) {
-      this.selectedIndex = clamped;
-      this.render();
-      if (this.lane === 'turbo' && this.laneIndicatorEl) {
-        const item = this.getSelectedItem();
-        const text = typeof item === 'object' ? item.text : (item || '');
-        const letter = text ? text.charAt(0).toUpperCase() : '';
-        const letterBadge = letter ? ` [${letter}]` : '';
-        this.laneIndicatorEl.textContent = `⚡ TRYB SZYBKI (x8)${letterBadge}`;
-      }
-      return true; // index changed
+    const indexChanged = clamped !== this.selectedIndex;
+    this.selectedIndex = clamped;
+    this.fraction = fraction;
+    this.render(fraction);
+    if (this.lane === 'turbo' && this.laneIndicatorEl) {
+      const item = this.getSelectedItem();
+      const text = typeof item === 'object' ? item.text : (item || '');
+      const letter = text ? text.charAt(0).toUpperCase() : '';
+      const letterBadge = letter ? ` [${letter}]` : '';
+      this.laneIndicatorEl.textContent = `⚡ TRYB SZYBKI (x8)${letterBadge}`;
     }
-    return false;
+    return indexChanged;
+  }
+
+  // Wskaźnik stabilności i dystansu do następnego wyboru
+  updateGauge(distancePx, direction, isLocked, distToCommitX = 0, nextStepName = '') {
+    if (!this.gaugeEl) {
+      this.gaugeEl = this.container.querySelector('.target-gauge-indicator');
+    }
+    if (!this.gaugeEl) return;
+
+    if (isLocked) {
+      const arrow = this.stepNumber % 2 === 1 ? '➔' : '◀';
+      const commitTxt = distToCommitX > 0 ? `${distToCommitX}px do ${nextStepName}` : 'PRZEJDŹ';
+      this.gaugeEl.innerHTML = `
+        <span class="gauge-pill gauge-locked">
+          <span class="gauge-lock-icon">🔒</span>
+          WYBÓR ZATWIERDZONY • ${commitTxt} ${arrow}
+        </span>
+      `;
+      this.container.classList.add('transition-locked');
+      return;
+    }
+
+    this.container.classList.remove('transition-locked');
+
+    if (direction === 'center') {
+      this.gaugeEl.innerHTML = `
+        <span class="gauge-pill gauge-stable">
+          <span class="gauge-dot"></span>
+          STABILNE (${distancePx}px do zmiany)
+        </span>
+      `;
+    } else if (direction === 'up') {
+      this.gaugeEl.innerHTML = `
+        <span class="gauge-pill gauge-drift">
+          <span class="gauge-arrow">▲</span>
+          ${distancePx}px do kolejnego
+        </span>
+      `;
+    } else {
+      this.gaugeEl.innerHTML = `
+        <span class="gauge-pill gauge-drift">
+          <span class="gauge-arrow">▼</span>
+          ${distancePx}px do poprzedniego
+        </span>
+      `;
+    }
+  }
+
+  resetGauge() {
+    if (!this.gaugeEl) {
+      this.gaugeEl = this.container.querySelector('.target-gauge-indicator');
+    }
+    if (!this.gaugeEl) return;
+    this.gaugeEl.innerHTML = `
+      <span class="gauge-pill gauge-stable">
+        <span class="gauge-dot"></span>
+        STABILNE (14px do zmiany)
+      </span>
+    `;
+    this.container.classList.remove('transition-locked');
   }
 
   getSelectedItem() {
@@ -105,7 +169,7 @@ export class DrumColumn {
   }
 
   // Renderowanie elementów w oknie bębna z efektem walca 3D
-  render() {
+  render(fraction = 0) {
     if (!this.wheelEl) return;
     const total = this.items.length;
     if (total === 0) {
@@ -133,23 +197,17 @@ export class DrumColumn {
         itemDiv.classList.add('selected');
       }
 
-      // Precyzyjne wyrównanie i 3D transformacja bębna:
-      if (isSelected) {
-        // Element wybrany pokrywa się w 100% z oknem docelowym (target-window)
-        itemDiv.style.transform = 'translate3d(0px, 0px, 0px) rotateX(0deg) scale(1)';
-        itemDiv.style.opacity = '1';
-        itemDiv.style.zIndex = '50';
-      } else {
-        const angle = diff * 14; // łagodny kąt obrotu walca
-        const translateY = diff * this.itemHeight;
-        const translateZ = -Math.abs(diff) * 16;
-        const scale = Math.max(0.72, 1 - Math.abs(diff) * 0.07);
-        const opacity = Math.max(0.12, 0.82 - Math.abs(diff) * 0.22);
+      // Wyrównanie i 3D transformacja bębna z fizycznym mikroruchem (sub-pixel parallax)
+      const visualDiff = diff + fraction;
+      const angle = visualDiff * 14; // łagodny kąt obrotu walca
+      const translateY = visualDiff * this.itemHeight;
+      const translateZ = -Math.abs(visualDiff) * 16;
+      const scale = Math.max(0.72, 1 - Math.abs(visualDiff) * 0.07);
+      const opacity = isSelected && fraction === 0 ? 1 : Math.max(0.12, 0.90 - Math.abs(visualDiff) * 0.25);
 
-        itemDiv.style.transform = `translate3d(0px, ${translateY}px, ${translateZ}px) rotateX(${-angle}deg) scale(${scale})`;
-        itemDiv.style.opacity = `${opacity}`;
-        itemDiv.style.zIndex = `${40 - Math.abs(diff)}`;
-      }
+      itemDiv.style.transform = `translate3d(0px, ${translateY}px, ${translateZ}px) rotateX(${-angle}deg) scale(${scale})`;
+      itemDiv.style.opacity = `${opacity}`;
+      itemDiv.style.zIndex = `${50 - Math.round(Math.abs(visualDiff) * 10)}`;
 
       // Zawartość pozycji - czytelne formatowanie dla długich nazw
       const itemText = typeof item === 'object' ? item.text : item;
