@@ -301,13 +301,12 @@ export class DrumColumn {
       categoryHtml = `<span class="item-cat">${this.escapeHtml(cat)}</span>`;
       titleHtml = `<span class="item-title">${this.escapeHtml(name)}</span>`;
     } else {
-      const iconSpan = icon ? `<span class="item-icon">${icon}</span> ` : '';
-      titleHtml = `<span class="item-title">${iconSpan}${this.escapeHtml(itemText)}</span>`;
+      titleHtml = `<span class="item-title">${this.escapeHtml(itemText)}</span>`;
     }
 
-    // Nowoczesna, minimalistyczna odznaka TOP (flat pill)
+    // Nowoczesna, minimalistyczna odznaka TOP (flat pill) oraz licznik pozycji w kategorii
     const topBadgeHtml = isTop ? `<span class="badge-top">TOP</span>` : '';
-    const countBadgeHtml = (count && !isTop && typeof count === 'number' && count > 1 && icon)
+    const countBadgeHtml = (this.stepNumber === 1 && typeof count === 'number' && count > 0)
       ? `<span class="item-count-subtle">${count} poz.</span>`
       : '';
 

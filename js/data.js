@@ -191,18 +191,18 @@ export const INITIAL_USAGE_STATS = {
   }
 };
 
-// Definicje i rozpoznawanie kategorii towarów
+// Definicje i rozpoznawanie kategorii towarów (czysty Flat Design, bez emoji)
 export const CATEGORY_DEFINITIONS = [
-  { id: 'all', name: 'Wszystkie (TOP)', icon: '⭐' },
-  { id: 'palety', name: 'Palety i Nośniki', icon: '🪵' },
-  { id: 'kartony', name: 'Kartony i Pojemniki', icon: '📦' },
-  { id: 'folie', name: 'Folie i Taśmy', icon: '🎗️' },
-  { id: 'bhp', name: 'BHP i Ochrona', icon: '🛡️' },
-  { id: 'chemia', name: 'Chemia i Czystość', icon: '🧪' },
-  { id: 'elektronika', name: 'Elektronika i Kable', icon: '🔌' },
-  { id: 'narzedzia', name: 'Narzędzia i Sprzęt', icon: '🛠️' },
-  { id: 'zlacza', name: 'Części i Złącza', icon: '🔩' },
-  { id: 'agd', name: 'AGD i Urządzenia', icon: '🏠' }
+  { id: 'all', name: 'Wszystkie (TOP)' },
+  { id: 'palety', name: 'Palety i Nośniki' },
+  { id: 'kartony', name: 'Kartony i Pojemniki' },
+  { id: 'folie', name: 'Folie i Taśmy' },
+  { id: 'bhp', name: 'BHP i Ochrona' },
+  { id: 'chemia', name: 'Chemia i Czystość' },
+  { id: 'elektronika', name: 'Elektronika i Kable' },
+  { id: 'narzedzia', name: 'Narzędzia i Sprzęt' },
+  { id: 'zlacza', name: 'Części i Złącza' },
+  { id: 'agd', name: 'AGD i Urządzenia' }
 ];
 
 export const getCategoryForItem = (itemText) => {

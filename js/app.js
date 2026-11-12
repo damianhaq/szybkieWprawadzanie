@@ -26,10 +26,10 @@ document.addEventListener('DOMContentLoaded', () => {
       uiManager.renderTasks();
       const coText = task.co || 'Zadanie';
       const ileText = task.ile ? ` (x${task.ile})` : '';
-      uiManager.showToast(`✔ Zapisano: ${coText}${ileText}`, 'success');
+      uiManager.showToast(`Zapisano: ${coText}${ileText}`, 'success');
     },
     onTaskCancelled: () => {
-      uiManager.showToast('🛑 Wprowadzanie anulowane', 'error');
+      uiManager.showToast('Wprowadzanie anulowane', 'error');
     }
   });
 

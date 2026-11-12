@@ -119,7 +119,7 @@ export class StorageManager {
     }
   }
 
-  addCustomCategory(name, icon = '🏷️') {
+  addCustomCategory(name) {
     const trimmed = (name || '').trim();
     if (!trimmed) return null;
 
@@ -135,11 +135,9 @@ export class StorageManager {
     );
     if (existing) return existing;
 
-    const cleanIcon = (icon || '🏷️').trim() || '🏷️';
     const newCat = {
       id: `custom_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      name: trimmed,
-      icon: cleanIcon
+      name: trimmed
     };
     customCats.push(newCat);
     this.saveCustomCategories(customCats);
@@ -202,6 +200,66 @@ export class StorageManager {
     if (categoryName) {
       this.addCustomCategory(categoryName);
       this.setItemCategory(trimmed, categoryName);
+    }
+
+    return true;
+  }
+
+  // Zmiana nazwy istniejącego towaru
+  updateItemName(oldName, newName) {
+    const trimmedOld = (oldName || '').trim();
+    const trimmedNew = (newName || '').trim();
+    if (!trimmedOld || !trimmedNew || trimmedOld === trimmedNew) return false;
+
+    const db = this.getDatabase();
+    if (!Array.isArray(db.co)) return false;
+
+    const idx = db.co.indexOf(trimmedOld);
+    if (idx === -1) return false;
+
+    db.co[idx] = trimmedNew;
+    this.saveDatabase(db);
+
+    // Przeniesienie powiązania kategorii
+    const itemCats = this.getItemCategories();
+    if (itemCats[trimmedOld]) {
+      itemCats[trimmedNew] = itemCats[trimmedOld];
+      delete itemCats[trimmedOld];
+      try {
+        getStorage().setItem(STORAGE_KEYS.ITEM_CATEGORIES, JSON.stringify(itemCats));
+      } catch (e) {}
+    }
+
+    // Przeniesienie statystyk użycia
+    const stats = this.getStats();
+    if (typeof stats[trimmedOld] === 'number') {
+      stats[trimmedNew] = stats[trimmedOld];
+      delete stats[trimmedOld];
+      try {
+        getStorage().setItem(STORAGE_KEYS.STATS, JSON.stringify(stats));
+      } catch (e) {}
+    }
+
+    return true;
+  }
+
+  // Usunięcie towaru z bazy
+  deleteItem(itemName) {
+    const trimmed = (itemName || '').trim();
+    if (!trimmed) return false;
+
+    const db = this.getDatabase();
+    if (!Array.isArray(db.co)) return false;
+
+    db.co = db.co.filter(i => i !== trimmed);
+    this.saveDatabase(db);
+
+    const itemCats = this.getItemCategories();
+    if (itemCats[trimmed]) {
+      delete itemCats[trimmed];
+      try {
+        getStorage().setItem(STORAGE_KEYS.ITEM_CATEGORIES, JSON.stringify(itemCats));
+      } catch (e) {}
     }
 
     return true;
@@ -307,7 +365,7 @@ export class StorageManager {
     };
   }
 
-  // Pobranie listy kategorii dla Kroku 1 (wbudowane + własne)
+  // Pobranie listy kategorii dla Kroku 1 (wbudowane + własne, czysty Flat Design bez emoji)
   getCategories(includeEmpty = false) {
     const db = this.getDatabase();
     const coList = Array.isArray(db.co) ? db.co : [];
@@ -319,10 +377,10 @@ export class StorageManager {
     }
 
     const categories = [
-      { id: 'all', name: '⭐ Wszystkie (i TOP)', icon: '⭐', count: coList.length }
+      { id: 'all', name: 'Wszystkie (TOP)', count: coList.length }
     ];
 
-    const seenNames = new Set(['⭐ Wszystkie (i TOP)', 'Wszystkie (TOP)', 'Wszystkie', 'all']);
+    const seenNames = new Set(['Wszystkie (TOP)', 'Wszystkie', 'all']);
 
     // 1. Kategorie wbudowane
     for (const def of CATEGORY_DEFINITIONS) {
@@ -332,7 +390,6 @@ export class StorageManager {
         categories.push({
           id: def.id,
           name: def.name,
-          icon: def.icon,
           count: count
         });
         seenNames.add(def.name);
@@ -348,7 +405,6 @@ export class StorageManager {
         categories.push({
           id: c.id,
           name: c.name,
-          icon: c.icon || '🏷️',
           count: count
         });
         seenNames.add(c.name);
@@ -361,7 +417,6 @@ export class StorageManager {
         categories.push({
           id: `cat_${catName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
           name: catName,
-          icon: '🏷️',
           count: count
         });
         seenNames.add(catName);
@@ -378,7 +433,7 @@ export class StorageManager {
 
     rawList.sort((a, b) => a.localeCompare(b, 'pl', { sensitivity: 'base' }));
 
-    if (categoryName && categoryName !== 'all' && categoryName !== 'Wszystkie' && categoryName !== '⭐ Wszystkie (i TOP)' && categoryName !== 'Wszystkie (TOP)') {
+    if (categoryName && categoryName !== 'all' && categoryName !== 'Wszystkie' && categoryName !== 'Wszystkie (TOP)' && !categoryName.startsWith('Wszystkie')) {
       rawList = rawList.filter(item => this.getItemCategory(item) === categoryName);
     }
 

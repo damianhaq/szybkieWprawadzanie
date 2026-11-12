@@ -156,10 +156,9 @@ console.assert(addRes1 === true, 'Dodawanie towaru powinno zwrócić true');
 const catFolie = sm.getItemCategory('Taśma wzmocniona włóknem szklanym');
 console.assert(catFolie === 'Folie i Taśmy', `Oczekiwano kategorii "Folie i Taśmy", otrzymano: ${catFolie}`);
 
-// 2. Dodanie nowej kategorii i towaru do tej nowej kategorii
-const newCat = sm.addCustomCategory('Farmaceutyki i Leki', '💊');
+// 2. Dodanie nowej kategorii (czysty Flat Design bez emoji) i towaru do tej nowej kategorii
+const newCat = sm.addCustomCategory('Farmaceutyki i Leki');
 console.assert(newCat && newCat.name === 'Farmaceutyki i Leki', 'Nowa kategoria powinna zostać utworzona');
-console.assert(newCat.icon === '💊', 'Nowa kategoria powinna zachować podaną ikonę');
 
 const addRes2 = sm.addItem('Paracetamol 500mg opakowanie zbiorcze', 'Farmaceutyki i Leki');
 console.assert(addRes2 === true, 'Dodawanie towaru do nowej kategorii powinno zwrócić true');
@@ -171,7 +170,6 @@ console.assert(catParacetamol === 'Farmaceutyki i Leki', `Oczekiwano "Farmaceuty
 const allCats = sm.getCategories();
 const foundNewCat = allCats.find(c => c.name === 'Farmaceutyki i Leki');
 console.assert(foundNewCat !== undefined, 'Nowa kategoria musi znajdować się na liście kategorii');
-console.assert(foundNewCat.icon === '💊', 'Ikona nowej kategorii musi się zgadzać');
 console.assert(foundNewCat.count === 1, `Liczba pozycji w nowej kategorii powinna wynosić 1, wynosi: ${foundNewCat.count}`);
 
 // 4. Pobranie listy towarów z nowej kategorii
@@ -187,10 +185,38 @@ console.assert(updatedSkad.items.some(i => i.text === 'Chłodnia Farmaceutyczna 
 
 console.log('✓ Dodawanie elementów i obsługa nowych kategorii w 100% poprawne:', {
   nowaKategoria: foundNewCat.name,
-  ikona: foundNewCat.icon,
   towar: 'Paracetamol 500mg opakowanie zbiorcze',
   lokalizacja: 'Chłodnia Farmaceutyczna F-01'
 });
+
+console.log('--- TEST 10: Nadawanie i zmiana kategorii istniejących towarów, zmiana nazwy i usuwanie ---');
+// 1. Zmiana kategorii istniejącego towaru
+const itemToReassign = 'Akumulatory żelowe 12V 7Ah';
+const oldCat = sm.getItemCategory(itemToReassign);
+console.assert(oldCat === 'Elektronika i Kable', `Początkowa kategoria to Elektronika i Kable, jest: ${oldCat}`);
+
+sm.setItemCategory(itemToReassign, 'Części i Złącza');
+const changedCat = sm.getItemCategory(itemToReassign);
+console.assert(changedCat === 'Części i Złącza', `Nowa kategoria powinna wynosić "Części i Złącza", wynosi: ${changedCat}`);
+
+const czesciList = sm.getCoListWithTop('Części i Złącza');
+console.assert(czesciList.items.some(i => i.text === itemToReassign), 'Przepisany towar musi być teraz na liście Części i Złącza');
+
+const elektronikaList = sm.getCoListWithTop('Elektronika i Kable');
+console.assert(!elektronikaList.items.some(i => i.text === itemToReassign), 'Przepisany towar NIE może już występować na liście Elektronika i Kable');
+
+// 2. Zmiana nazwy towaru
+const renameOk = sm.updateItemName('Akumulatory żelowe 12V 7Ah', 'Akumulatory żelowe AGM 12V 7.2Ah');
+console.assert(renameOk === true, 'Zmiana nazwy powinna zwrócić true');
+console.assert(sm.getItemCategory('Akumulatory żelowe AGM 12V 7.2Ah') === 'Części i Złącza', 'Kategoria musi przejść na nową nazwę');
+
+// 3. Usunięcie towaru
+const delOk = sm.deleteItem('Akumulatory żelowe AGM 12V 7.2Ah');
+console.assert(delOk === true, 'Usunięcie powinno zwrócić true');
+const checkDb = sm.getDatabase();
+console.assert(!checkDb.co.includes('Akumulatory żelowe AGM 12V 7.2Ah'), 'Towar został usunięty z bazy');
+
+console.log('✓ Nadawanie i zmiana kategorii, zmiana nazwy oraz usuwanie w 100% poprawne');
 
 console.log('\n========================================');
 console.log('WSZYSTKIE TESTY JEDNOSTKOWE ZAKOŃCZONE SUKCESEM!');

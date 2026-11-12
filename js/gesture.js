@@ -120,7 +120,7 @@ export class GestureEngine {
 
     this.drumRight.setStepData(
       2,
-      `2. TOWAR (${activeCat?.icon || '📦'} ${catName || 'Wszystkie'})`,
+      `2. TOWAR (${catName || 'Wszystkie'})`,
       'Czeka na gest w prawo ➔',
       this.cachedData.coList,
       0
@@ -198,7 +198,7 @@ export class GestureEngine {
         this.topBarEl.classList.add('cancel-zone-active');
         feedback.cancelZoneEntered();
         this.updatePreviewUI(true);
-        this.updatePuckCallout('⚠️ ANULUJ ZADANIE', true);
+        this.updatePuckCallout('ANULUJ ZADANIE', true);
       }
       return;
     } else {
@@ -238,7 +238,7 @@ export class GestureEngine {
 
       this.drumRight.setStepData(
         2,
-        `2. TOWAR (${selectedCat?.icon || '📦'} ${catName || 'Wszystkie'})`,
+        `2. TOWAR (${catName || 'Wszystkie'})`,
         'Przesuń góra/dół • W lewo do SKĄD',
         this.cachedData.coList,
         0
@@ -410,7 +410,7 @@ export class GestureEngine {
           this.cachedData.coList = storage.getCoListWithTop(catName).items;
           this.drumRight.setStepData(
             2,
-            `2. TOWAR (${cat.icon || '📦'} ${catName})`,
+            `2. TOWAR (${catName || 'Wszystkie'})`,
             'Czeka na gest w prawo ➔',
             this.cachedData.coList,
             0
@@ -725,7 +725,7 @@ export class GestureEngine {
     if (isCancelling) {
       this.previewEl.innerHTML = `
         <span class="preview-cancel-alert">
-          ⚠️ UPUŚĆ PALEC, ABY ANULOWAĆ ZADANIE
+          UPUŚĆ PALEC, ABY ANULOWAĆ ZADANIE
         </span>
       `;
       return;

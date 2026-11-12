@@ -115,7 +115,8 @@
         <div class="drawer-handle"></div>
         <div class="drawer-title-row">
           <div class="drawer-title">
-            <span>📦 Zapisane zadania</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+            <span>Zapisane zadania</span>
             <span class="drawer-subtitle" id="drawerActiveCount">0 do zrobienia</span>
           </div>
           <div class="drawer-controls">
@@ -166,7 +167,7 @@
           <!-- 1. SZYBKIE DODAWANIE NOWEGO TOWARU Z KATEGORIĄ -->
           <div class="db-section-card">
             <div class="modal-section-title">
-              <span>➕ Dodaj nowy towar</span>
+              <span>Dodaj nowy towar</span>
             </div>
             <form id="formAddNewItem" class="db-form" onsubmit="return false;">
               <div class="db-field-group">
@@ -189,12 +190,9 @@
               <!-- Pola nowej kategorii (widoczne po wybraniu "+ Utwórz nową kategorię...") -->
               <div class="db-field-group new-cat-box" id="newCatFields" style="display: none;">
                 <label class="db-field-label" for="inputNewCatName">
-                  <span>Nowa kategoria i ikona</span>
+                  <span>Nazwa nowej kategorii</span>
                 </label>
-                <div class="new-cat-inputs">
-                  <input type="text" id="inputNewCatIcon" class="db-input icon-input" value="🏷️" placeholder="Emoji" maxlength="4" title="Emoji kategorii">
-                  <input type="text" id="inputNewCatName" class="db-input name-input" placeholder="Wpisz nazwę nowej kategorii..." autocomplete="off">
-                </div>
+                <input type="text" id="inputNewCatName" class="db-input" placeholder="Wpisz nazwę nowej kategorii..." autocomplete="off">
               </div>
 
               <button type="submit" class="btn-primary btn-block" id="btnSubmitNewItem">
@@ -204,10 +202,34 @@
             </form>
           </div>
 
-          <!-- 2. SZYBKIE DODAWANIE LOKALIZACJI -->
+          <!-- 2. EDYCJA ISTNIEJĄCYCH TOWARÓW I ZMIANA KATEGORII -->
+          <div class="db-section-card item-manager-card">
+            <div class="modal-section-title">
+              <span>Towary i kategorie (edycja istniejących)</span>
+              <span class="db-items-count-badge" id="dbItemsCountBadge">0 pozycji</span>
+            </div>
+
+            <!-- Narzędzia filtru i wyszukiwania -->
+            <div class="item-manager-toolbar">
+              <div class="search-input-wrap">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="search" id="inputSearchItems" class="db-input db-search-input" placeholder="Szukaj towaru...">
+              </div>
+              <select id="filterItemsByCategory" class="db-select filter-cat-select" title="Filtruj listę po kategorii">
+                <!-- Wypełniane dynamicznie przez JS -->
+              </select>
+            </div>
+
+            <!-- Przewijana lista towarów -->
+            <div class="db-items-list" id="dbItemsList">
+              <!-- Renderowane dynamicznie przez JS -->
+            </div>
+          </div>
+
+          <!-- 3. SZYBKIE DODAWANIE LOKALIZACJI -->
           <div class="db-section-card">
             <div class="modal-section-title">
-              <span>📍 Dodaj nową lokalizację (SKĄD / DOKĄD)</span>
+              <span>Dodaj nową lokalizację (SKĄD / DOKĄD)</span>
             </div>
             <form id="formAddNewLocation" class="db-add-inline" onsubmit="return false;">
               <input type="text" id="inputNewLocation" class="db-input" placeholder="np. Regał Wysoki D-01..08" required autocomplete="off">
@@ -215,10 +237,10 @@
             </form>
           </div>
 
-          <!-- 3. SAMOUCZĄCA SIĘ CZOŁÓWKA (TOP) -->
+          <!-- 4. SAMOUCZĄCA SIĘ CZOŁÓWKA (TOP) -->
           <div>
             <div class="modal-section-title">
-              <span>🔥 Najczęstsze towary (Czołówka TOP)</span>
+              <span>Najczęstsze towary (Czołówka TOP)</span>
               <button type="button" class="btn-danger-ghost" id="btnResetStats">Zresetuj liczniki</button>
             </div>
             <div class="top-stats-grid" id="topStatsList">
@@ -226,7 +248,7 @@
             </div>
           </div>
 
-          <!-- 4. USTAWIENIA DŹWIĘKU I HAPTYKI -->
+          <!-- 5. USTAWIENIA DŹWIĘKU I HAPTYKI -->
           <div>
             <div class="modal-section-title">Sygnalizacja</div>
             <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -253,10 +275,10 @@
             </div>
           </div>
 
-          <!-- 5. HURTOWA EDYCJA POZYCJI W POLACH TEKSTOWYCH (DLA ZAAWANSOWANYCH) -->
+          <!-- 6. HURTOWA EDYCJA POZYCJI W POLACH TEKSTOWYCH (DLA ZAAWANSOWANYCH) -->
           <details class="db-details-accordion">
             <summary class="db-details-summary">
-              <span>✏️ Hurtowa edycja list (pola tekstowe)</span>
+              <span>Hurtowa edycja list (pola tekstowe)</span>
               <span class="db-details-arrow">▾</span>
             </summary>
             <div class="db-details-content">
@@ -349,7 +371,9 @@
             </div>
 
             <div class="tutorial-step-card" style="border-color: var(--emerald-primary);">
-              <div class="tutorial-step-number" style="background: var(--emerald-primary);">✔</div>
+              <div class="tutorial-step-number" style="background: var(--emerald-primary);">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
               <div class="tutorial-step-content">
                 <h4 style="color: var(--emerald-primary);">Wczesne zakończenie (Early Release)</h4>
                 <p>Możesz oderwać palec od ekranu w <b>DOWOLNYM</b> momencie (np. po samym towarze lub po SKĄD). Zadanie zapisuje się natychmiast z wybranymi dotąd danymi!</p>
@@ -357,7 +381,9 @@
             </div>
 
             <div class="tutorial-step-card" style="border-color: var(--crimson-danger);">
-              <div class="tutorial-step-number" style="background: var(--crimson-danger); color: #fff;">✕</div>
+              <div class="tutorial-step-number" style="background: var(--crimson-danger); color: #fff;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </div>
               <div class="tutorial-step-content">
                 <h4 style="color: var(--crimson-danger);">Anulowanie zadania</h4>
                 <p>Jeśli zmienisz zdanie w trakcie gestu, przeciągnij palec na <b>Górny Pasek (Top Bar)</b> i puść ekran. Wpis zostanie skasowany bez zapisywania.</p>

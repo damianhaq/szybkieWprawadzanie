@@ -17,6 +17,7 @@ export class UIManager {
     this.initDrawer();
     this.initModals();
     this.initDbEditor();
+    this.initItemsManager();
     this.renderTasks();
   }
 
@@ -115,7 +116,11 @@ export class UIManager {
     if (filteredTasks.length === 0) {
       this.drawerListEl.innerHTML = `
         <div class="empty-tasks-placeholder">
-          <div class="empty-icon">📦</div>
+          <div class="empty-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+            </svg>
+          </div>
           <div class="empty-text">Brak zadań w tej kategorii.</div>
           <div class="empty-subtext">Wykonaj gest na bębnie powyżej, aby dodać pierwsze zadanie.</div>
         </div>
@@ -173,7 +178,7 @@ export class UIManager {
           feedback.tick(false);
           this.renderTasks();
           if (updated.completed) {
-            this.showToast('Zadanie zrobione! ✔', 'success');
+            this.showToast('Zadanie ukończone', 'success');
           }
         }
       });
@@ -279,7 +284,7 @@ export class UIManager {
     }
   }
 
-  // Wypełnienie listy wyboru kategorii w formularzu dodawania
+  // Wypełnienie listy wyboru kategorii w formularzu dodawania (bez emoji)
   loadCategorySelectOptions(preferredSelected = null) {
     const select = document.getElementById('selectItemCategory');
     if (!select) return;
@@ -290,11 +295,11 @@ export class UIManager {
 
     let html = validCats.map(c => `
       <option value="${this.escape(c.name)}" ${preferredSelected === c.name ? 'selected' : ''}>
-        ${c.icon || '🏷️'} ${this.escape(c.name)} (${c.count})
+        ${this.escape(c.name)} (${c.count})
       </option>
     `).join('');
 
-    html += `<option value="__new__" ${preferredSelected === '__new__' ? 'selected' : ''}>➕ Utwórz nową kategorię...</option>`;
+    html += `<option value="__new__" ${preferredSelected === '__new__' ? 'selected' : ''}>+ Utwórz nową kategorię...</option>`;
     select.innerHTML = html;
   }
 
@@ -307,7 +312,6 @@ export class UIManager {
     const selectItemCategory = document.getElementById('selectItemCategory');
     const newCatFields = document.getElementById('newCatFields');
     const inputNewCatName = document.getElementById('inputNewCatName');
-    const inputNewCatIcon = document.getElementById('inputNewCatIcon');
 
     if (selectItemCategory) {
       selectItemCategory.addEventListener('change', () => {
@@ -338,8 +342,7 @@ export class UIManager {
           if (inputNewCatName) inputNewCatName.focus();
           return;
         }
-        const customIcon = (inputNewCatIcon?.value || '🏷️').trim() || '🏷️';
-        const created = storage.addCustomCategory(customCatName, customIcon);
+        const created = storage.addCustomCategory(customCatName);
         categoryName = created ? created.name : customCatName;
       }
 
@@ -350,6 +353,8 @@ export class UIManager {
       if (newCatFields) newCatFields.style.display = 'none';
 
       this.loadCategorySelectOptions(categoryName);
+      this.renderCategoryFilterOptions();
+      this.renderItemsList();
       this.loadDbToInputs();
 
       if (this.gestureEngine) {
@@ -357,7 +362,7 @@ export class UIManager {
         this.gestureEngine.resetToStep1();
       }
 
-      this.showToast(`✔ Dodano towar: "${itemName}" [${categoryName}]`, 'success');
+      this.showToast(`Dodano towar: "${itemName}" [${categoryName}]`, 'success');
     };
 
     if (formAddNewItem) {
@@ -390,7 +395,7 @@ export class UIManager {
         this.gestureEngine.resetToStep1();
       }
 
-      this.showToast(`✔ Dodano lokalizację: "${locName}"`, 'success');
+      this.showToast(`Dodano lokalizację: "${locName}"`, 'success');
     };
 
     if (formAddNewLocation) {
@@ -457,6 +462,8 @@ export class UIManager {
 
         storage.saveDatabase(newDb);
         this.loadCategorySelectOptions();
+        this.renderCategoryFilterOptions();
+        this.renderItemsList();
 
         if (this.gestureEngine) {
           this.gestureEngine.refreshData();
@@ -474,6 +481,8 @@ export class UIManager {
           storage.resetDatabaseToDefault();
           this.loadDbToInputs();
           this.loadCategorySelectOptions();
+          this.renderCategoryFilterOptions();
+          this.renderItemsList();
 
           if (this.gestureEngine) {
             this.gestureEngine.refreshData();
@@ -499,6 +508,172 @@ export class UIManager {
     }
   }
 
+  // Menedżer istniejących towarów - nadawanie i zmiana kategorii
+  initItemsManager() {
+    this.dbItemsList = document.getElementById('dbItemsList');
+    this.inputSearchItems = document.getElementById('inputSearchItems');
+    this.filterItemsByCategory = document.getElementById('filterItemsByCategory');
+    this.dbItemsCountBadge = document.getElementById('dbItemsCountBadge');
+
+    if (this.inputSearchItems) {
+      this.inputSearchItems.addEventListener('input', () => this.renderItemsList());
+    }
+
+    if (this.filterItemsByCategory) {
+      this.filterItemsByCategory.addEventListener('change', () => this.renderItemsList());
+    }
+
+    if (this.dbItemsList) {
+      // Zmiana kategorii dla wybranego towaru
+      this.dbItemsList.addEventListener('change', (e) => {
+        const select = e.target.closest('.item-category-select');
+        if (!select) return;
+
+        const itemName = select.dataset.item;
+        let newCategory = select.value;
+
+        if (newCategory === '__new__') {
+          const customName = prompt('Podaj nazwę nowej kategorii dla tego towaru:');
+          if (customName && customName.trim()) {
+            const created = storage.addCustomCategory(customName.trim());
+            newCategory = created ? created.name : customName.trim();
+          } else {
+            this.renderItemsList();
+            return;
+          }
+        }
+
+        storage.setItemCategory(itemName, newCategory);
+        this.loadCategorySelectOptions();
+        this.renderCategoryFilterOptions();
+        this.renderItemsList();
+        this.loadDbToInputs();
+
+        if (this.gestureEngine) {
+          this.gestureEngine.refreshData();
+          this.gestureEngine.resetToStep1();
+        }
+
+        this.showToast(`Zmieniono kategorię: "${itemName}" ➔ ${newCategory}`, 'success');
+      });
+
+      // Usuwanie i zmiana nazwy towaru
+      this.dbItemsList.addEventListener('click', (e) => {
+        const delBtn = e.target.closest('.btn-item-delete');
+        if (delBtn) {
+          const itemName = delBtn.dataset.item;
+          if (confirm(`Czy na pewno chcesz usunąć towar "${itemName}" z bazy?`)) {
+            storage.deleteItem(itemName);
+            this.loadCategorySelectOptions();
+            this.renderCategoryFilterOptions();
+            this.renderItemsList();
+            this.loadDbToInputs();
+
+            if (this.gestureEngine) {
+              this.gestureEngine.refreshData();
+              this.gestureEngine.resetToStep1();
+            }
+
+            this.showToast(`Usunięto towar: "${itemName}"`, 'info');
+          }
+          return;
+        }
+
+        const renameBtn = e.target.closest('.btn-item-rename');
+        if (renameBtn) {
+          const itemName = renameBtn.dataset.item;
+          const newName = prompt('Zmień nazwę towaru:', itemName);
+          if (newName && newName.trim() && newName.trim() !== itemName) {
+            storage.updateItemName(itemName, newName.trim());
+            this.renderItemsList();
+            this.loadDbToInputs();
+
+            if (this.gestureEngine) {
+              this.gestureEngine.refreshData();
+              this.gestureEngine.resetToStep1();
+            }
+
+            this.showToast(`Zaktualizowano nazwę: "${newName.trim()}"`, 'success');
+          }
+        }
+      });
+    }
+  }
+
+  renderCategoryFilterOptions() {
+    if (!this.filterItemsByCategory) return;
+    const currentVal = this.filterItemsByCategory.value || 'all';
+    const categories = storage.getCategories(true);
+    const validCats = categories.filter(c => c.id !== 'all' && !c.name.includes('Wszystkie'));
+
+    let html = `<option value="all">Wszystkie kategorie</option>`;
+    html += validCats.map(c => `
+      <option value="${this.escape(c.name)}" ${currentVal === c.name ? 'selected' : ''}>
+        ${this.escape(c.name)} (${c.count})
+      </option>
+    `).join('');
+
+    this.filterItemsByCategory.innerHTML = html;
+  }
+
+  renderItemsList() {
+    if (!this.dbItemsList) return;
+
+    const db = storage.getDatabase();
+    const allItems = Array.isArray(db.co) ? db.co : [];
+    const query = (this.inputSearchItems?.value || '').toLowerCase().trim();
+    const filterCat = this.filterItemsByCategory?.value || 'all';
+
+    const categories = storage.getCategories(true).filter(c => c.id !== 'all' && !c.name.includes('Wszystkie'));
+
+    const filtered = allItems.filter(item => {
+      const itemCat = storage.getItemCategory(item);
+      if (filterCat !== 'all' && itemCat !== filterCat) {
+        return false;
+      }
+      if (query && !item.toLowerCase().includes(query) && !itemCat.toLowerCase().includes(query)) {
+        return false;
+      }
+      return true;
+    });
+
+    if (this.dbItemsCountBadge) {
+      this.dbItemsCountBadge.textContent = `${filtered.length} z ${allItems.length} pozycji`;
+    }
+
+    if (filtered.length === 0) {
+      this.dbItemsList.innerHTML = `<div class="empty-item-manager">Brak towarów spełniających kryteria.</div>`;
+      return;
+    }
+
+    const html = filtered.map(item => {
+      const itemCat = storage.getItemCategory(item);
+      return `
+        <div class="db-item-row" data-item="${this.escape(item)}">
+          <span class="db-item-name" title="${this.escape(item)}">${this.escape(item)}</span>
+          <select class="db-select item-category-select" data-item="${this.escape(item)}" title="Zmień kategorię dla tego towaru">
+            ${categories.map(c => `
+              <option value="${this.escape(c.name)}" ${itemCat === c.name ? 'selected' : ''}>
+                ${this.escape(c.name)}
+              </option>
+            `).join('')}
+            <option value="__new__">+ Nowa kategoria...</option>
+          </select>
+          <div class="item-actions">
+            <button type="button" class="btn-item-action btn-item-rename" data-item="${this.escape(item)}" title="Zmień nazwę towaru" aria-label="Zmień nazwę towaru">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </button>
+            <button type="button" class="btn-item-action btn-item-delete" data-item="${this.escape(item)}" title="Usuń towar z bazy" aria-label="Usuń towar z bazy">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    this.dbItemsList.innerHTML = html;
+  }
+
   loadDbToInputs() {
     const db = storage.getDatabase();
     const textareaCo = document.getElementById('textareaCo');
@@ -512,6 +687,8 @@ export class UIManager {
     }
     if (textareaIle) textareaIle.value = (db.ile || []).join('\n');
 
+    this.renderCategoryFilterOptions();
+    this.renderItemsList();
     this.loadTopStatsView();
   }
 
