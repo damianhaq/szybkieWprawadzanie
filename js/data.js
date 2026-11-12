@@ -154,12 +154,78 @@ export const INITIAL_TASKS = [
   }
 ];
 
-// Początkowe liczniki dla samouczącej się czołówki (TOP 6)
+// Początkowe liczniki dla samouczącej się czołówki (TOP dla każdego etapu)
 export const INITIAL_USAGE_STATS = {
+  // Towary (CO) - bezpośrednie klucze dla pełnej kompatybilności wstecznej
   "Paleta EURO 1200x800": 34,
   "Folia ręczna stretch transparent": 28,
   "Karton klapowy 600x400x400": 21,
   "Etykiety termiczne 100x150 rolka": 17,
   "Taśma pakowa kauczukowa brąz": 14,
-  "Elektronika - Czytniki kodów Zebra": 9
+  "Elektronika - Czytniki kodów Zebra": 9,
+
+  // Lokalizacje początkowe (SKĄD)
+  "_skad": {
+    "Rampa 01 (Przyjęcia)": 32,
+    "Strefa Buforowa A": 26,
+    "Regał Wysoki A-01..12": 19,
+    "Półki Kompletacji K-1": 15
+  },
+
+  // Lokalizacje docelowe (DOKĄD)
+  "_dokad": {
+    "Regał Wysoki A-01..12": 30,
+    "Stanowisko Pakowania 1": 24,
+    "Rampa 05 (Wysyłka)": 18,
+    "Strefa Konsolidacji": 12
+  },
+
+  // Ilości (ILE)
+  "_ile": {
+    "1": 38,
+    "1 Paleta": 29,
+    "2": 22,
+    "1 Karton": 18,
+    "2 Palety": 14,
+    "5": 11
+  }
+};
+
+// Definicje i rozpoznawanie kategorii towarów
+export const CATEGORY_DEFINITIONS = [
+  { id: 'all', name: 'Wszystkie (TOP)', icon: '⭐' },
+  { id: 'palety', name: 'Palety i Nośniki', icon: '🪵' },
+  { id: 'kartony', name: 'Kartony i Pojemniki', icon: '📦' },
+  { id: 'folie', name: 'Folie i Taśmy', icon: '🎗️' },
+  { id: 'bhp', name: 'BHP i Ochrona', icon: '🛡️' },
+  { id: 'chemia', name: 'Chemia i Czystość', icon: '🧪' },
+  { id: 'elektronika', name: 'Elektronika i Kable', icon: '🔌' },
+  { id: 'narzedzia', name: 'Narzędzia i Sprzęt', icon: '🛠️' },
+  { id: 'zlacza', name: 'Części i Złącza', icon: '🔩' },
+  { id: 'agd', name: 'AGD i Urządzenia', icon: '🏠' }
+];
+
+export const getCategoryForItem = (itemText) => {
+  if (typeof itemText !== 'string') return 'Inne';
+  const dashIdx = itemText.indexOf(' - ');
+  if (dashIdx !== -1) {
+    const prefix = itemText.substring(0, dashIdx).trim();
+    if (prefix === 'AGD') return 'AGD i Urządzenia';
+    if (prefix === 'BHP') return 'BHP i Ochrona';
+    if (prefix === 'Chemia') return 'Chemia i Czystość';
+    if (prefix === 'Elektronika' || prefix === 'Automatyka') return 'Elektronika i Kable';
+    if (prefix === 'Elektronarzędzia' || prefix === 'Narzędzia') return 'Narzędzia i Sprzęt';
+    if (prefix === 'Części' || prefix === 'Elementy złączne' || prefix === 'Drobiazgi') return 'Części i Złącza';
+    return prefix;
+  }
+  const lower = itemText.toLowerCase();
+  if (lower.includes('palet') || lower.includes('skrzyniopaleta')) return 'Palety i Nośniki';
+  if (lower.includes('karton') || lower.includes('pojemnik') || lower.includes('kosz')) return 'Kartony i Pojemniki';
+  if (lower.includes('folia') || lower.includes('taśma') || lower.includes('etykiet')) return 'Folie i Taśmy';
+  if (lower.includes('bhp') || lower.includes('rękawic') || lower.includes('obuwie') || lower.includes('kask') || lower.includes('okulary') || lower.includes('apteczk') || lower.includes('kamizelk')) return 'BHP i Ochrona';
+  if (lower.includes('chemia') || lower.includes('płyn') || lower.includes('odtłuszczacz') || lower.includes('rozpuszczalnik') || lower.includes('worki')) return 'Chemia i Czystość';
+  if (lower.includes('narzędzi') || lower.includes('nożyk') || lower.includes('klucz') || lower.includes('młotek') || lower.includes('wózek')) return 'Narzędzia i Sprzęt';
+  if (lower.includes('śrub') || lower.includes('nakrętk') || lower.includes('podkładk') || lower.includes('wkręt') || lower.includes('opaski') || lower.includes('zawias') || lower.includes('łożysk') || lower.includes('paski') || lower.includes('zszywki')) return 'Części i Złącza';
+  if (lower.includes('elektron') || lower.includes('kabl') || lower.includes('przewod') || lower.includes('bater') || lower.includes('akumulator') || lower.includes('żarówk')) return 'Elektronika i Kable';
+  return 'Inne towary';
 };

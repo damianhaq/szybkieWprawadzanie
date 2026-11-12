@@ -138,7 +138,7 @@ export class DrumColumn {
     return indexChanged;
   }
 
-  // Wskaźnik stabilności i dystansu do następnego wyboru
+  // Wskaźnik stabilności i kierunku wyboru (minimalistyczny, bez wartości px)
   updateGauge(distancePx, direction, isLocked, distToCommitX = 0, nextStepName = '') {
     if (!this.gaugeEl) {
       this.gaugeEl = this.container.querySelector('.target-gauge-indicator');
@@ -147,11 +147,10 @@ export class DrumColumn {
 
     if (isLocked) {
       const arrow = this.stepNumber % 2 === 1 ? '➔' : '◀';
-      const commitTxt = distToCommitX > 0 ? `${distToCommitX}px do ${nextStepName}` : 'PRZEJDŹ';
+      const targetTxt = nextStepName ? `PRZEJDŹ DO: ${nextStepName}` : 'PRZEJDŹ';
       this.gaugeEl.innerHTML = `
         <span class="gauge-pill gauge-locked">
-          <span class="gauge-lock-icon">🔒</span>
-          WYBÓR ZATWIERDZONY • ${commitTxt} ${arrow}
+          ${targetTxt} ${arrow}
         </span>
       `;
       this.container.classList.add('transition-locked');
@@ -161,25 +160,24 @@ export class DrumColumn {
     this.container.classList.remove('transition-locked');
 
     if (direction === 'center') {
-      const info = this.zoom < 0.35 ? 'Szybki podgląd' : `${distancePx}px do zmiany`;
       this.gaugeEl.innerHTML = `
         <span class="gauge-pill gauge-stable">
           <span class="gauge-dot"></span>
-          STABILNE (${info})
+          WYBRANO
         </span>
       `;
     } else if (direction === 'up') {
       this.gaugeEl.innerHTML = `
         <span class="gauge-pill gauge-drift">
           <span class="gauge-arrow">▲</span>
-          ${distancePx}px do kolejnego
+          KOLEJNY
         </span>
       `;
     } else {
       this.gaugeEl.innerHTML = `
         <span class="gauge-pill gauge-drift">
           <span class="gauge-arrow">▼</span>
-          ${distancePx}px do poprzedniego
+          POPRZEDNI
         </span>
       `;
     }
@@ -193,7 +191,7 @@ export class DrumColumn {
     this.gaugeEl.innerHTML = `
       <span class="gauge-pill gauge-stable">
         <span class="gauge-dot"></span>
-        STABILNE (18px do zmiany)
+        GOTOWE
       </span>
     `;
     this.container.classList.remove('transition-locked');
@@ -287,9 +285,10 @@ export class DrumColumn {
     itemDiv.className = 'wheel-item';
     itemDiv.dataset.index = i;
 
-    const itemText = typeof item === 'object' ? item.text : item;
+    const itemText = typeof item === 'object' ? (item.text || item.name) : item;
     const isTop = typeof item === 'object' && item.isTop;
     const count = typeof item === 'object' && item.count;
+    const icon = typeof item === 'object' && item.icon ? item.icon : '';
 
     let categoryHtml = '';
     let titleHtml = '';
@@ -302,18 +301,24 @@ export class DrumColumn {
       categoryHtml = `<span class="item-cat">${this.escapeHtml(cat)}</span>`;
       titleHtml = `<span class="item-title">${this.escapeHtml(name)}</span>`;
     } else {
-      titleHtml = `<span class="item-title">${this.escapeHtml(itemText)}</span>`;
+      const iconSpan = icon ? `<span class="item-icon">${icon}</span> ` : '';
+      titleHtml = `<span class="item-title">${iconSpan}${this.escapeHtml(itemText)}</span>`;
     }
 
-    const topFlameHtml = isTop ? `<span class="top-flame-icon" title="Czołówka TOP (${count}x)">🔥</span>` : '';
+    // Nowoczesna, minimalistyczna odznaka TOP (flat pill)
+    const topBadgeHtml = isTop ? `<span class="badge-top">TOP</span>` : '';
+    const countBadgeHtml = (count && !isTop && typeof count === 'number' && count > 1 && icon)
+      ? `<span class="item-count-subtle">${count} poz.</span>`
+      : '';
 
     itemDiv.innerHTML = `
       <div class="drum-card ${isTop ? 'card-top' : ''}">
-        ${topFlameHtml}
+        ${topBadgeHtml}
         <div class="card-text-box">
           ${categoryHtml}
           ${titleHtml}
         </div>
+        ${countBadgeHtml}
       </div>
     `;
 

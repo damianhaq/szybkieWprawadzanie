@@ -39,10 +39,10 @@
         </nav>
       </div>
 
-      <!-- Podgląd łańcucha na żywo -->
+      <!-- Podgląd łańcucha na żywo (Flat Minimal) -->
       <div class="live-preview-box" id="livePreviewBox">
         <div class="preview-chain">
-          <span class="preview-placeholder">[CO]</span>
+          <span class="preview-placeholder">[TOWAR]</span>
           <span class="preview-arrow">➔</span>
           <span class="preview-placeholder">[SKĄD]</span>
           <span class="preview-arrow">➔</span>
@@ -51,6 +51,13 @@
         </div>
       </div>
     </header>
+
+    <!-- Pasek szybkiego filtrowania kategorii (Category Nav) -->
+    <nav class="category-filter-nav" id="categoryFilterNav" aria-label="Szybki wybór kategorii">
+      <div class="category-pill-track" id="categoryPillTrack">
+        <!-- Generowane dynamicznie przez UIManager -->
+      </div>
+    </nav>
 
     <!-- 2. GŁÓWNY OBSZAR GESTÓW (GESTURE PAD - ~63%) -->
     <main class="gesture-pad" id="gesturePad">
@@ -61,7 +68,7 @@
             <span class="column-step-badge">KROK 1</span>
             <span class="zoom-indicator">100% PRECYZJA</span>
           </div>
-          <div class="column-title">1. Wybierz towar (CO)</div>
+          <div class="column-title">1. Kategoria</div>
         </div>
 
         <div class="wheel-viewport">
@@ -87,7 +94,7 @@
             <span class="column-step-badge">KROK 2</span>
             <span class="zoom-indicator">100% PRECYZJA</span>
           </div>
-          <div class="column-title">2. Lokalizacja (SKĄD)</div>
+          <div class="column-title">2. Towar (CO)</div>
         </div>
 
         <div class="wheel-viewport">
@@ -98,16 +105,16 @@
         </div>
       </section>
 
-      <!-- Płynny wskaźnik dotyku / kursor (Pointer Puck) -->
-      <div class="pointer-puck" id="pointerPuck">
-        <div class="puck-distance-callout" id="puckDistanceCallout"></div>
-      </div>
-
-      <!-- Pasek podpowiedzi z informacją o dynamicznym zoomie kafelków -->
+      <!-- Pasek podpowiedzi (Minimal Flat) -->
       <div class="gesture-footer-hint">
-        ← Zewnętrzna krawędź: szybki podgląd | Środek ekranu: duży kafelek i zatwierdzenie →
+        ← Zewnętrzna krawędź: szybki podgląd | Środek ekranu: zatwierdzenie kroku →
       </div>
     </main>
+
+    <!-- Płynny wskaźnik dotyku / kursor (Pointer Puck) - Fixed Overlay -->
+    <div class="pointer-puck" id="pointerPuck">
+      <div class="puck-distance-callout" id="puckDistanceCallout"></div>
+    </div>
 
     <!-- 3. DOLNY PANEL ZADAŃ (DRAWER - ~25%, ROZWIJANY) -->
     <aside class="task-drawer" id="taskDrawer">

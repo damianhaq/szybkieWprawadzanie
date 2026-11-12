@@ -14,6 +14,7 @@ export class UIManager {
 
     this.currentFilter = 'all'; // 'all' | 'active' | 'completed'
 
+    this.initCategoryBar();
     this.initDrawer();
     this.initModals();
     this.initDbEditor();
@@ -22,6 +23,40 @@ export class UIManager {
 
   setGestureEngine(engine) {
     this.gestureEngine = engine;
+  }
+
+  // Pasek szybkiego filtrowania kategorii
+  initCategoryBar() {
+    this.categoryPillTrack = document.getElementById('categoryPillTrack');
+    if (!this.categoryPillTrack) return;
+    this.renderCategoryPills();
+
+    this.categoryPillTrack.addEventListener('click', (e) => {
+      const btn = e.target.closest('.category-pill-btn');
+      if (!btn) return;
+      const catId = btn.dataset.catId;
+      const catName = btn.dataset.catName;
+      this.selectCategory(catId, catName);
+    });
+  }
+
+  renderCategoryPills(activeCatId = 'all') {
+    if (!this.categoryPillTrack) return;
+    const categories = storage.getCategories();
+    this.categoryPillTrack.innerHTML = categories.map(cat => `
+      <button type="button" class="category-pill-btn ${cat.id === activeCatId ? 'active' : ''}" data-cat-id="${cat.id}" data-cat-name="${cat.name}">
+        <span class="cat-pill-icon">${cat.icon}</span>
+        <span class="cat-pill-name">${cat.name.replace(' (i TOP)', '')}</span>
+        <span class="cat-pill-count">${cat.count}</span>
+      </button>
+    `).join('');
+  }
+
+  selectCategory(catId, catName) {
+    this.renderCategoryPills(catId);
+    if (this.gestureEngine) {
+      this.gestureEngine.setCategoryFilter(catId, catName);
+    }
   }
 
   // Obsługa dolnego panelu zadań (Bottom Drawer)
@@ -312,6 +347,7 @@ export class UIManager {
         }
 
         storage.saveDatabase(newDb);
+        this.renderCategoryPills();
         if (this.gestureEngine) {
           this.gestureEngine.refreshData();
           this.gestureEngine.resetToStep1();
@@ -327,6 +363,7 @@ export class UIManager {
         if (confirm('Czy na pewno chcesz przywrócić fabryczną bazę magazynową (ponad 60 towarów)?')) {
           storage.resetDatabaseToDefault();
           this.loadDbToInputs();
+          this.renderCategoryPills();
           if (this.gestureEngine) {
             this.gestureEngine.refreshData();
             this.gestureEngine.resetToStep1();

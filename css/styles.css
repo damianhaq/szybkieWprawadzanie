@@ -274,6 +274,77 @@ html, body {
 }
 
 /* ==========================================================================
+   PASEK FILTROWANIA KATEGORII (CATEGORY NAV) - PŁASKI I MINIMALISTYCZNY
+   ========================================================================== */
+.category-filter-nav {
+  width: 100%;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 4px 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  flex-shrink: 0;
+  z-index: 35;
+}
+
+.category-filter-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.category-pill-track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+}
+
+.category-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  user-select: none;
+}
+
+.category-pill-btn:hover {
+  background-color: var(--bg-card-hover);
+  color: var(--text-main);
+  border-color: var(--border-medium);
+}
+
+.category-pill-btn.active {
+  background-color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.cat-pill-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.cat-pill-count {
+  font-size: 9px;
+  opacity: 0.75;
+  padding: 1px 4px;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ==========================================================================
    2. GŁÓWNY OBSZAR GESTÓW (GESTURE PAD - ~63%)
    ========================================================================== */
 .gesture-pad {
@@ -587,10 +658,41 @@ html, body {
   color: #60a5fa;
 }
 
-.top-flame-icon {
-  font-size: 12px;
-  flex-shrink: 0;
+/* ODZNAKA TOP (CZYSTY MINIMALISTYCZNY PŁASKI PILL) */
+.badge-top {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--accent-amber);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  text-transform: uppercase;
   line-height: 1;
+  flex-shrink: 0;
+}
+
+.item-count-subtle {
+  font-size: 9px;
+  color: var(--text-dim);
+  padding: 1px 4px;
+  border-radius: 3px;
+  background-color: rgba(255, 255, 255, 0.05);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.item-icon {
+  display: inline-block;
+  font-size: 13px;
+  line-height: 1;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.top-flame-icon {
+  display: none;
 }
 
 /* TRYB KOMPAKTOWY (ZOOM < 0.45) */
@@ -651,9 +753,9 @@ html, body {
 }
 
 .transition-distance-badge {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 4px;
   background-color: var(--bg-surface);
   border: 1px solid var(--border-medium);
@@ -669,23 +771,23 @@ html, body {
   color: var(--accent-primary);
 }
 
-/* WSKAŹNIK DOTYKU (POINTER PUCK) */
+/* WSKAŹNIK DOTYKU (POINTER PUCK) - PRECYZYJNY FIXED OVERLAY */
 .pointer-puck {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
-  width: 32px;
-  height: 32px;
-  margin-top: -16px;
-  margin-left: -16px;
+  width: 28px;
+  height: 28px;
+  margin: 0;
   border-radius: 50%;
   background-color: rgba(59, 130, 246, 0.15);
-  border: 1.5px solid var(--accent-primary);
+  border: 2px solid var(--accent-primary);
   pointer-events: none;
-  z-index: 60;
+  z-index: 9999;
   opacity: 0;
   transition: opacity 0.12s ease;
   will-change: transform;
+  transform: translate3d(-100px, -100px, 0);
 }
 
 .pointer-puck.visible {
@@ -694,13 +796,13 @@ html, body {
 
 .puck-distance-callout {
   position: absolute;
-  bottom: 42px;
+  bottom: 34px;
   left: 50%;
   transform: translateX(-50%);
   background-color: var(--bg-surface);
-  border: 1px solid var(--border-medium);
+  border: 1px solid var(--accent-primary);
   border-radius: 4px;
-  padding: 2px 7px;
+  padding: 2px 8px;
   font-size: 9.5px;
   font-weight: 700;
   color: var(--text-main);
@@ -716,7 +818,7 @@ html, body {
 
 .puck-distance-callout.locked {
   border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
+  color: #ffffff;
   background-color: #0c2d48;
 }
 

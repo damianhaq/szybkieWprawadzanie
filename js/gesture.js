@@ -15,21 +15,24 @@ export class GestureEngine {
     this.onTaskSaved = options.onTaskSaved || (() => {});
     this.onTaskCancelled = options.onTaskCancelled || (() => {});
 
-    // Stan maszyny stanów
+    // Stan maszyny stanów:
+    // 1: KATEGORIA (L), 2: TOWAR (P), 3: SKĄD (L), 4: DOKĄD (P), 5: ILE (L)
     this.isDragging = false;
     this.activePointerId = null;
-    this.currentStep = 1; // 1: CO (L), 2: SKĄD (P), 3: DOKĄD (L), 4: ILE (P)
-    this.currentZoom = 1.0; // Płynny zoom 2D na osi X (0.0: kompaktowy/szybki -> 1.0: duży kafelek/precyzyjny)
+    this.currentStep = 1;
+    this.currentZoom = 1.0;
     this.lastZoom = 1.0;
     this.isInCancelZone = false;
-    this.isTransitionLocked = false; // Blokada korytarza przejścia w bok przed przypadkową zmianą pozycji
+    this.isTransitionLocked = false;
+    this.selectedCategory = null;
 
-    // Kotwice przewijania relatywnego (Relative Scrolling)
-    this.anchorY = 0;
-    this.anchorIndex = 0;
+    // Pozycjonowanie zmiennoprzecinkowe
+    this.floatIndex = 0;
+    this.lastClientY = 0;
 
     // Wersja robocza tworzonego zadania
     this.taskDraft = {
+      category: null,
       co: null,
       skad: null,
       dokad: null,
@@ -38,6 +41,7 @@ export class GestureEngine {
 
     // Pamięć podręczna baz danych
     this.cachedData = {
+      categories: [],
       coList: [],
       skadList: [],
       dokadList: [],
@@ -49,49 +53,76 @@ export class GestureEngine {
     this.resetToStep1();
   }
 
-  // Odświeżenie danych z bazy (np. po edycji w ustawieniach lub zmianie TOP)
+  // Odświeżenie danych z bazy (TOP na każdym etapie)
   refreshData() {
-    const coData = storage.getCoListWithTop();
-    const db = storage.getDatabase();
-    const locList = (db.lokalizacje || db.skad || []).map(item => ({ text: item }));
+    this.cachedData.categories = storage.getCategories().map(c => ({
+      text: c.name,
+      name: c.name,
+      id: c.id,
+      icon: c.icon,
+      count: c.count
+    }));
 
+    const coData = storage.getCoListWithTop(this.selectedCategory);
     this.cachedData.coList = coData.items;
-    this.cachedData.skadList = locList;
-    this.cachedData.dokadList = locList;
-    this.cachedData.ileList = (db.ile || []).map(item => ({ text: item }));
+
+    // Najczęstsze na KAŻDYM etapie
+    this.cachedData.skadList = storage.getSkadListWithTop().items;
+    this.cachedData.dokadList = storage.getDokadListWithTop().items;
+    this.cachedData.ileList = storage.getIleListWithTop().items;
   }
 
-  // Przygotowanie widoku do Kroku 1
+  // Ustawienie aktywnej kategorii z paska szybkiego wyboru
+  setCategoryFilter(catId, catName) {
+    this.selectedCategory = (catId === 'all') ? null : catName;
+    this.refreshData();
+    if (!this.isDragging) {
+      this.resetToStep1();
+    }
+  }
+
+  // Przygotowanie widoku do Kroku 1 (KATEGORIA)
   resetToStep1() {
     this.currentStep = 1;
     this.currentZoom = 1.0;
     this.lastZoom = 1.0;
     this.isInCancelZone = false;
     this.isTransitionLocked = false;
-    this.taskDraft = { co: null, skad: null, dokad: null, ile: null };
+    this.taskDraft = { category: null, co: null, skad: null, dokad: null, ile: null };
     this.floatIndex = 0;
     this.lastClientY = 0;
 
     this.clearTransitionBadge();
     this.hidePuckCallout();
 
-    // Lewa kolumna: Krok 1 (CO)
+    // Wyznaczenie początkowego indeksu kategorii
+    let initialCatIndex = 0;
+    if (this.selectedCategory) {
+      const idx = this.cachedData.categories.findIndex(c => c.name === this.selectedCategory);
+      if (idx !== -1) initialCatIndex = idx;
+    }
+
+    // Lewa kolumna: Krok 1 (KATEGORIA)
     this.drumLeft.setStepData(
       1,
-      '1. WYBIERZ TOWAR (CO)',
-      'Przesuń góra/dół • W prawo do SKĄD',
-      this.cachedData.coList,
-      0
+      '1. KATEGORIA',
+      'Przesuń góra/dół • W prawo do TOWAR',
+      this.cachedData.categories,
+      initialCatIndex
     );
     this.drumLeft.setZoom(1.0);
     this.drumLeft.setActive(true);
 
-    // Prawa kolumna: Podgląd Kroku 2 (SKĄD)
+    // Prawa kolumna: Podgląd Kroku 2 (TOWARY z wybranej kategorii)
+    const activeCat = this.cachedData.categories[initialCatIndex];
+    const catName = activeCat ? activeCat.name : null;
+    this.cachedData.coList = storage.getCoListWithTop(catName).items;
+
     this.drumRight.setStepData(
       2,
-      '2. LOKALIZACJA (SKĄD)',
-      'Czeka na gest w prawo ->',
-      this.cachedData.skadList,
+      `2. TOWAR (${activeCat?.icon || '📦'} ${catName || 'Wszystkie'})`,
+      'Czeka na gest w prawo ➔',
+      this.cachedData.coList,
       0
     );
     this.drumRight.setZoom(1.0);
@@ -102,21 +133,15 @@ export class GestureEngine {
   }
 
   initEvents() {
-    // Pointer Events zapewniają pełną unifikację myszy i ekranu dotykowego
     this.padEl.addEventListener('pointerdown', this.handlePointerDown.bind(this), { passive: false });
     window.addEventListener('pointermove', this.handlePointerMove.bind(this), { passive: false });
     window.addEventListener('pointerup', this.handlePointerUp.bind(this), { passive: false });
     window.addEventListener('pointercancel', this.handlePointerCancel.bind(this), { passive: false });
-
-    // Zabezpieczenie przed gestami domyślnymi
     this.padEl.addEventListener('contextmenu', e => e.preventDefault());
   }
 
   handlePointerDown(e) {
-    // Ignoruj dodatkowe palce podczas trwania gestu jednoręcznego
     if (this.isDragging) return;
-
-    // Odblokuj Web Audio API przy pierwszym dotyku
     feedback.unlockAudio();
 
     this.isDragging = true;
@@ -125,18 +150,16 @@ export class GestureEngine {
       this.padEl.setPointerCapture(e.pointerId);
     } catch (err) {}
 
-    // Oblicz wymiary okna
     const width = window.innerWidth;
     const clientX = e.clientX;
     const clientY = e.clientY;
     const leftThreshold = width * 0.47;
 
-    // Start zawsze w Kroku 1 (CO)
+    // Start zawsze w Kroku 1 (KATEGORIA)
     this.currentStep = 1;
-    this.taskDraft = { co: null, skad: null, dokad: null, ile: null };
+    this.taskDraft = { category: null, co: null, skad: null, dokad: null, ile: null };
     this.hasBeenInLeftZone = clientX <= leftThreshold;
 
-    // Początkowy zoom kafelka na podstawie pozycji X palca
     const initialZoom = Math.max(0, Math.min(1, (clientX - width * 0.04) / (width * 0.30)));
     this.currentZoom = initialZoom;
     this.lastZoom = initialZoom;
@@ -144,24 +167,19 @@ export class GestureEngine {
     this.drumLeft.setActive(true);
     this.drumRight.setActive(false);
 
-    // Kotwica startowa dla płynnego relatywnego przewijania
     this.floatIndex = this.drumLeft.selectedIndex;
     this.lastClientY = clientY;
     this.drumLeft.setPosition(this.floatIndex);
-    this.anchorY = clientY;
-    this.anchorIndex = this.drumLeft.selectedIndex;
     this.isTransitionLocked = false;
     this.clearTransitionBadge();
 
     this.showPointerPuck(clientX, clientY);
     this.updatePreviewUI();
-
     e.preventDefault();
   }
 
   handlePointerMove(e) {
     if (!this.isDragging || e.pointerId !== this.activePointerId) return;
-
     e.preventDefault();
 
     const clientX = e.clientX;
@@ -182,17 +200,17 @@ export class GestureEngine {
         this.updatePreviewUI(true);
         this.updatePuckCallout('⚠️ ANULUJ ZADANIE', true);
       }
-      return; // W strefie anulowania nie przewijamy list
+      return;
     } else {
       if (this.isInCancelZone) {
         this.isInCancelZone = false;
         this.topBarEl.classList.remove('cancel-zone-active');
         this.updatePreviewUI(false);
-        this.anchorY = clientY; // Zapobiega skokowi po opuszczeniu strefy anulowania
+        this.lastClientY = clientY;
       }
     }
 
-    // 2. Obsługa Maszyny Stanów i Przejść Między Kolumnami z Histerezą (47% - 53%)
+    // 2. Obsługa Maszyny Stanów (47% - 53%)
     const leftThreshold = width * 0.47;
     const rightThreshold = width * 0.53;
 
@@ -200,118 +218,166 @@ export class GestureEngine {
       this.hasBeenInLeftZone = true;
     }
 
-    // A. KROK 1 -> KROK 2 (Z LEWEJ DO PRAWEJ)
+    // A. KROK 1 -> KROK 2 (KATEGORIA -> TOWAR, z LEWEJ do PRAWEJ)
     if (this.currentStep === 1 && this.hasBeenInLeftZone && clientX >= rightThreshold) {
       this.isTransitionLocked = false;
       this.clearTransitionBadge();
-      const selectedItem = this.drumLeft.getSelectedItem();
-      this.taskDraft.co = selectedItem ? selectedItem.text : '';
+
+      const selectedCat = this.drumLeft.getSelectedItem();
+      const catName = selectedCat ? (selectedCat.name || selectedCat.text) : null;
+      this.taskDraft.category = catName;
 
       this.currentStep = 2;
       this.currentZoom = 1.0;
       this.lastZoom = 1.0;
       feedback.stepCommit(1);
 
-      // Lewa strefa w tle natychmiast podmienia zawartość na KROK 3 (DOKĄD)
+      // Prawa kolumna staje się aktywna (KROK 2: TOWAR)
+      const coData = storage.getCoListWithTop(catName);
+      this.cachedData.coList = coData.items;
+
+      this.drumRight.setStepData(
+        2,
+        `2. TOWAR (${selectedCat?.icon || '📦'} ${catName || 'Wszystkie'})`,
+        'Przesuń góra/dół • W lewo do SKĄD',
+        this.cachedData.coList,
+        0
+      );
+      this.drumRight.setActive(true);
+      this.drumRight.setZoom(1.0);
+      this.drumRight.resetGauge();
+
+      // Lewa kolumna w tle przygotowuje KROK 3 (SKĄD)
       this.drumLeft.setStepData(
         3,
-        '3. CEL (DOKĄD)',
-        'Czeka na powrót w lewo <-',
-        this.cachedData.dokadList,
+        '3. LOKALIZACJA (SKĄD)',
+        'Czeka na powrót w lewo ◀',
+        this.cachedData.skadList,
         0
       );
       this.drumLeft.setZoom(1.0);
       this.drumLeft.setActive(false);
 
-      // Prawa strefa staje się aktywna (KROK 2: SKĄD)
-      this.drumRight.setActive(true);
-      this.drumRight.setZoom(1.0);
-      this.drumRight.resetGauge();
       this.floatIndex = this.drumRight.selectedIndex;
       this.lastClientY = clientY;
       this.drumRight.setPosition(this.floatIndex);
-      this.anchorY = clientY;
-      this.anchorIndex = this.drumRight.selectedIndex;
 
       this.updatePreviewUI();
       return;
     }
 
-    // B. KROK 2 -> KROK 3 (Z PRAWEJ DO LEWEJ)
+    // B. KROK 2 -> KROK 3 (TOWAR -> SKĄD, z PRAWEJ do LEWEJ)
     if (this.currentStep === 2 && clientX <= leftThreshold) {
       this.isTransitionLocked = false;
       this.clearTransitionBadge();
-      const selectedItem = this.drumRight.getSelectedItem();
-      this.taskDraft.skad = selectedItem ? selectedItem.text : '';
+
+      const selectedCo = this.drumRight.getSelectedItem();
+      this.taskDraft.co = selectedCo ? selectedCo.text : '';
 
       this.currentStep = 3;
       this.currentZoom = 1.0;
       this.lastZoom = 1.0;
       feedback.stepCommit(2);
 
-      // Prawa strefa w tle natychmiast podmienia zawartość na KROK 4 (ILE)
+      // Prawa kolumna w tle przygotowuje KROK 4 (DOKĄD)
       this.drumRight.setStepData(
         4,
-        '4. ILOŚĆ (ILE)',
-        'Czeka na gest w prawo ->',
-        this.cachedData.ileList,
+        '4. CEL (DOKĄD)',
+        'Czeka na gest w prawo ➔',
+        this.cachedData.dokadList,
         0
       );
       this.drumRight.setZoom(1.0);
       this.drumRight.setActive(false);
 
-      // Lewa strefa staje się aktywna (KROK 3: DOKĄD)
+      // Lewa kolumna staje się aktywna (KROK 3: SKĄD)
       this.drumLeft.setActive(true);
       this.drumLeft.setZoom(1.0);
       this.drumLeft.resetGauge();
+
       this.floatIndex = this.drumLeft.selectedIndex;
       this.lastClientY = clientY;
       this.drumLeft.setPosition(this.floatIndex);
-      this.anchorY = clientY;
-      this.anchorIndex = this.drumLeft.selectedIndex;
 
       this.updatePreviewUI();
       return;
     }
 
-    // C. KROK 3 -> KROK 4 (Z LEWEJ DO PRAWEJ)
+    // C. KROK 3 -> KROK 4 (SKĄD -> DOKĄD, z LEWEJ do PRAWEJ)
     if (this.currentStep === 3 && clientX >= rightThreshold) {
       this.isTransitionLocked = false;
       this.clearTransitionBadge();
-      const selectedItem = this.drumLeft.getSelectedItem();
-      this.taskDraft.dokad = selectedItem ? selectedItem.text : '';
+
+      const selectedSkad = this.drumLeft.getSelectedItem();
+      this.taskDraft.skad = selectedSkad ? selectedSkad.text : '';
 
       this.currentStep = 4;
       this.currentZoom = 1.0;
       this.lastZoom = 1.0;
       feedback.stepCommit(3);
 
-      // Prawa strefa staje się aktywna (KROK 4: ILE)
+      // Lewa kolumna w tle przygotowuje KROK 5 (ILE)
+      this.drumLeft.setStepData(
+        5,
+        '5. ILOŚĆ (ILE)',
+        'Czeka na powrót w lewo ◀',
+        this.cachedData.ileList,
+        0
+      );
+      this.drumLeft.setZoom(1.0);
+      this.drumLeft.setActive(false);
+
+      // Prawa kolumna staje się aktywna (KROK 4: DOKĄD)
       this.drumRight.setActive(true);
       this.drumRight.setZoom(1.0);
       this.drumRight.resetGauge();
-      this.drumLeft.setActive(false);
+
       this.floatIndex = this.drumRight.selectedIndex;
       this.lastClientY = clientY;
       this.drumRight.setPosition(this.floatIndex);
-      this.anchorY = clientY;
-      this.anchorIndex = this.drumRight.selectedIndex;
 
       this.updatePreviewUI();
       return;
     }
 
-    // 3. Relatywne przewijanie aktywnej kolumny z kafelkami i dynamicznym zoomem 2D
+    // D. KROK 4 -> KROK 5 (DOKĄD -> ILE, z PRAWEJ do LEWEJ)
+    if (this.currentStep === 4 && clientX <= leftThreshold) {
+      this.isTransitionLocked = false;
+      this.clearTransitionBadge();
+
+      const selectedDokad = this.drumRight.getSelectedItem();
+      this.taskDraft.dokad = selectedDokad ? selectedDokad.text : '';
+
+      this.currentStep = 5;
+      this.currentZoom = 1.0;
+      this.lastZoom = 1.0;
+      feedback.stepCommit(4);
+
+      this.drumRight.setActive(false);
+
+      // Lewa kolumna staje się aktywna (KROK 5: ILE)
+      this.drumLeft.setActive(true);
+      this.drumLeft.setZoom(1.0);
+      this.drumLeft.resetGauge();
+
+      this.floatIndex = this.drumLeft.selectedIndex;
+      this.lastClientY = clientY;
+      this.drumLeft.setPosition(this.floatIndex);
+
+      this.updatePreviewUI();
+      return;
+    }
+
+    // 3. Relatywne przewijanie aktywnej kolumny
     if (this.currentStep === 1) {
-      // Jeśli palec zmierza w prawo w stronę linii środkowej, natychmiast blokujemy ruch pionowy!
+      // KROK 1: KATEGORIA (Lewa kolumna)
       const isHeadingRight = this.hasBeenInLeftZone && clientX >= width * 0.35;
       if (isHeadingRight) {
         this.isTransitionLocked = true;
-        const distToCommitX = Math.max(0, Math.round(rightThreshold - clientX));
         this.drumLeft.setZoom(1.0);
-        this.drumLeft.updateGauge(0, 'center', true, distToCommitX, 'SKĄD');
-        this.updatePuckCallout(`ZABLOKOWANE (${distToCommitX}px do SKĄD)`, true);
-        this.updateTransitionBadge(`➔ ${distToCommitX}px`);
+        this.drumLeft.updateGauge(0, 'center', true, 0, 'TOWAR');
+        this.updatePuckCallout('PRZEJDŹ DO: TOWAR ➔', true);
+        this.updateTransitionBadge('➔');
         return;
       }
 
@@ -321,25 +387,35 @@ export class GestureEngine {
         this.lastClientY = clientY;
       }
 
-      // Dynamiczny zoom kafelka na osi X: od lewej krawędzi (mini/szybki) do środka (duży kafelek/precyzyjny)
       const minX = width * 0.04;
       const maxX = width * 0.34;
       const currentZoom = Math.max(0, Math.min(1, (clientX - minX) / (maxX - minX)));
       this.currentZoom = currentZoom;
       this.drumLeft.setZoom(currentZoom);
 
-      // Skok w px zależny od zoomu: 18px (szybki) do 42px (duży kafelek)
       const stepPx = Math.round(18 + currentZoom * 24);
       const dy = clientY - this.lastClientY;
       this.lastClientY = clientY;
 
-      const totalItems = this.cachedData.coList.length;
+      const totalItems = this.cachedData.categories.length;
       this.floatIndex -= dy / stepPx;
       this.floatIndex = Math.max(0, Math.min(totalItems - 1, this.floatIndex));
 
       const changed = this.drumLeft.setPosition(this.floatIndex);
       if (changed) {
         feedback.tick(currentZoom < 0.35);
+        const cat = this.drumLeft.getSelectedItem();
+        if (cat) {
+          const catName = cat.name || cat.text;
+          this.cachedData.coList = storage.getCoListWithTop(catName).items;
+          this.drumRight.setStepData(
+            2,
+            `2. TOWAR (${cat.icon || '📦'} ${catName})`,
+            'Czeka na gest w prawo ➔',
+            this.cachedData.coList,
+            0
+          );
+        }
         this.updatePreviewUI();
       }
 
@@ -351,24 +427,23 @@ export class GestureEngine {
 
       this.drumLeft.updateGauge(distPx, direction, false);
       if (currentZoom < 0.35) {
-        this.updatePuckCallout(`SZYBKO (${Math.round(currentZoom * 100)}%)`);
+        this.updatePuckCallout('SZYBKO');
       } else if (direction === 'center') {
-        this.updatePuckCallout(`PRECYZJA (${distPx}px do zmiany)`);
+        this.updatePuckCallout('KATEGORIA');
       } else if (direction === 'up') {
-        this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
+        this.updatePuckCallout('▲ KOLEJNA');
       } else {
-        this.updatePuckCallout(`▼ ${distPx}px do poprzedniego`);
+        this.updatePuckCallout('▼ POPRZEDNIA');
       }
     } else if (this.currentStep === 2) {
-      // Blokada korytarza powrotu w lewo do KROKU 3 (DOKĄD)
+      // KROK 2: TOWAR (Prawa kolumna)
       const isHeadingLeft = clientX <= width * 0.65;
       if (isHeadingLeft) {
         this.isTransitionLocked = true;
-        const distToCommitX = Math.max(0, Math.round(clientX - leftThreshold));
         this.drumRight.setZoom(1.0);
-        this.drumRight.updateGauge(0, 'center', true, distToCommitX, 'DOKĄD');
-        this.updatePuckCallout(`ZABLOKOWANE (${distToCommitX}px do DOKĄD)`, true);
-        this.updateTransitionBadge(`◀ ${distToCommitX}px`);
+        this.drumRight.updateGauge(0, 'center', true, 0, 'SKĄD');
+        this.updatePuckCallout('◀ PRZEJDŹ DO: SKĄD', true);
+        this.updateTransitionBadge('◀');
         return;
       }
 
@@ -378,12 +453,65 @@ export class GestureEngine {
         this.lastClientY = clientY;
       }
 
-      // Prawa strona: od prawej krawędzi (mini) do środka (duży kafelek)
       const minX = width * 0.66;
       const maxX = width * 0.96;
       const currentZoom = Math.max(0, Math.min(1, (maxX - clientX) / (maxX - minX)));
       this.currentZoom = currentZoom;
       this.drumRight.setZoom(currentZoom);
+
+      const stepPx = Math.round(18 + currentZoom * 24);
+      const dy = clientY - this.lastClientY;
+      this.lastClientY = clientY;
+
+      const totalItems = this.cachedData.coList.length;
+      this.floatIndex -= dy / stepPx;
+      this.floatIndex = Math.max(0, Math.min(totalItems - 1, this.floatIndex));
+
+      const changed = this.drumRight.setPosition(this.floatIndex);
+      if (changed) {
+        feedback.tick(currentZoom < 0.35);
+        this.updatePreviewUI();
+      }
+
+      const targetIndex = Math.round(this.floatIndex);
+      const diffFromTarget = this.floatIndex - targetIndex;
+      const distUnits = 0.5 - Math.abs(diffFromTarget);
+      const distPx = Math.max(0, Math.round(distUnits * stepPx));
+      const direction = diffFromTarget > 0.08 ? 'up' : (diffFromTarget < -0.08 ? 'down' : 'center');
+
+      this.drumRight.updateGauge(distPx, direction, false);
+      if (currentZoom < 0.35) {
+        this.updatePuckCallout('SZYBKO');
+      } else if (direction === 'center') {
+        this.updatePuckCallout('TOWAR');
+      } else if (direction === 'up') {
+        this.updatePuckCallout('▲ KOLEJNY');
+      } else {
+        this.updatePuckCallout('▼ POPRZEDNI');
+      }
+    } else if (this.currentStep === 3) {
+      // KROK 3: SKĄD (Lewa kolumna)
+      const isHeadingRight = clientX >= width * 0.35;
+      if (isHeadingRight) {
+        this.isTransitionLocked = true;
+        this.drumLeft.setZoom(1.0);
+        this.drumLeft.updateGauge(0, 'center', true, 0, 'DOKĄD');
+        this.updatePuckCallout('PRZEJDŹ DO: DOKĄD ➔', true);
+        this.updateTransitionBadge('➔');
+        return;
+      }
+
+      if (this.isTransitionLocked) {
+        this.isTransitionLocked = false;
+        this.clearTransitionBadge();
+        this.lastClientY = clientY;
+      }
+
+      const minX = width * 0.04;
+      const maxX = width * 0.34;
+      const currentZoom = Math.max(0, Math.min(1, (clientX - minX) / (maxX - minX)));
+      this.currentZoom = currentZoom;
+      this.drumLeft.setZoom(currentZoom);
 
       const stepPx = Math.round(18 + currentZoom * 24);
       const dy = clientY - this.lastClientY;
@@ -393,6 +521,60 @@ export class GestureEngine {
       this.floatIndex -= dy / stepPx;
       this.floatIndex = Math.max(0, Math.min(totalItems - 1, this.floatIndex));
 
+      const changed = this.drumLeft.setPosition(this.floatIndex);
+      if (changed) {
+        feedback.tick(currentZoom < 0.35);
+        this.updatePreviewUI();
+      }
+
+      const targetIndex = Math.round(this.floatIndex);
+      const diffFromTarget = this.floatIndex - targetIndex;
+      const distUnits = 0.5 - Math.abs(diffFromTarget);
+      const distPx = Math.max(0, Math.round(distUnits * stepPx));
+      const direction = diffFromTarget > 0.08 ? 'up' : (diffFromTarget < -0.08 ? 'down' : 'center');
+
+      this.drumLeft.updateGauge(distPx, direction, false);
+      if (currentZoom < 0.35) {
+        this.updatePuckCallout('SZYBKO');
+      } else if (direction === 'center') {
+        this.updatePuckCallout('SKĄD');
+      } else if (direction === 'up') {
+        this.updatePuckCallout('▲ KOLEJNY');
+      } else {
+        this.updatePuckCallout('▼ POPRZEDNI');
+      }
+    } else if (this.currentStep === 4) {
+      // KROK 4: DOKĄD (Prawa kolumna)
+      const isHeadingLeft = clientX <= width * 0.65;
+      if (isHeadingLeft) {
+        this.isTransitionLocked = true;
+        this.drumRight.setZoom(1.0);
+        this.drumRight.updateGauge(0, 'center', true, 0, 'ILE');
+        this.updatePuckCallout('◀ PRZEJDŹ DO: ILE', true);
+        this.updateTransitionBadge('◀');
+        return;
+      }
+
+      if (this.isTransitionLocked) {
+        this.isTransitionLocked = false;
+        this.clearTransitionBadge();
+        this.lastClientY = clientY;
+      }
+
+      const minX = width * 0.66;
+      const maxX = width * 0.96;
+      const currentZoom = Math.max(0, Math.min(1, (maxX - clientX) / (maxX - minX)));
+      this.currentZoom = currentZoom;
+      this.drumRight.setZoom(currentZoom);
+
+      const stepPx = Math.round(18 + currentZoom * 24);
+      const dy = clientY - this.lastClientY;
+      this.lastClientY = clientY;
+
+      const totalItems = this.cachedData.dokadList.length;
+      this.floatIndex -= dy / stepPx;
+      this.floatIndex = Math.max(0, Math.min(totalItems - 1, this.floatIndex));
+
       const changed = this.drumRight.setPosition(this.floatIndex);
       if (changed) {
         feedback.tick(currentZoom < 0.35);
@@ -407,34 +589,22 @@ export class GestureEngine {
 
       this.drumRight.updateGauge(distPx, direction, false);
       if (currentZoom < 0.35) {
-        this.updatePuckCallout(`SZYBKO (${Math.round(currentZoom * 100)}%)`);
+        this.updatePuckCallout('SZYBKO');
       } else if (direction === 'center') {
-        this.updatePuckCallout(`PRECYZJA (${distPx}px do zmiany)`);
+        this.updatePuckCallout('DOKĄD');
       } else if (direction === 'up') {
-        this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
+        this.updatePuckCallout('▲ KOLEJNY');
       } else {
-        this.updatePuckCallout(`▼ ${distPx}px do poprzedniego`);
+        this.updatePuckCallout('▼ POPRZEDNI');
       }
-    } else if (this.currentStep === 3) {
-      // Blokada korytarza przejścia w prawo do KROKU 4 (ILE)
-      const isHeadingRight = clientX >= width * 0.35;
-      if (isHeadingRight) {
-        this.isTransitionLocked = true;
-        const distToCommitX = Math.max(0, Math.round(rightThreshold - clientX));
-        this.drumLeft.setZoom(1.0);
-        this.drumLeft.updateGauge(0, 'center', true, distToCommitX, 'ILE');
-        this.updatePuckCallout(`ZABLOKOWANE (${distToCommitX}px do ILE)`, true);
-        this.updateTransitionBadge(`➔ ${distToCommitX}px`);
-        return;
-      }
-
+    } else if (this.currentStep === 5) {
+      // KROK 5: ILE (Lewa kolumna)
       if (this.isTransitionLocked) {
         this.isTransitionLocked = false;
         this.clearTransitionBadge();
         this.lastClientY = clientY;
       }
 
-      // Lewa strona: zoom od krawędzi do środka
       const minX = width * 0.04;
       const maxX = width * 0.34;
       const currentZoom = Math.max(0, Math.min(1, (clientX - minX) / (maxX - minX)));
@@ -445,7 +615,7 @@ export class GestureEngine {
       const dy = clientY - this.lastClientY;
       this.lastClientY = clientY;
 
-      const totalItems = this.cachedData.dokadList.length;
+      const totalItems = this.cachedData.ileList.length;
       this.floatIndex -= dy / stepPx;
       this.floatIndex = Math.max(0, Math.min(totalItems - 1, this.floatIndex));
 
@@ -463,57 +633,13 @@ export class GestureEngine {
 
       this.drumLeft.updateGauge(distPx, direction, false);
       if (currentZoom < 0.35) {
-        this.updatePuckCallout(`SZYBKO (${Math.round(currentZoom * 100)}%)`);
+        this.updatePuckCallout('SZYBKO');
       } else if (direction === 'center') {
-        this.updatePuckCallout(`PRECYZJA (${distPx}px do zmiany)`);
+        this.updatePuckCallout('PUŚĆ ABY ZAPISAĆ');
       } else if (direction === 'up') {
-        this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
+        this.updatePuckCallout('▲ KOLEJNY');
       } else {
-        this.updatePuckCallout(`▼ ${distPx}px do poprzedniego`);
-      }
-    } else if (this.currentStep === 4) {
-      if (this.isTransitionLocked) {
-        this.isTransitionLocked = false;
-        this.clearTransitionBadge();
-        this.lastClientY = clientY;
-      }
-
-      // Prawa strona: zoom od krawędzi do środka
-      const minX = width * 0.66;
-      const maxX = width * 0.96;
-      const currentZoom = Math.max(0, Math.min(1, (maxX - clientX) / (maxX - minX)));
-      this.currentZoom = currentZoom;
-      this.drumRight.setZoom(currentZoom);
-
-      const stepPx = Math.round(18 + currentZoom * 24);
-      const dy = clientY - this.lastClientY;
-      this.lastClientY = clientY;
-
-      const totalItems = this.cachedData.ileList.length;
-      this.floatIndex -= dy / stepPx;
-      this.floatIndex = Math.max(0, Math.min(totalItems - 1, this.floatIndex));
-
-      const changed = this.drumRight.setPosition(this.floatIndex);
-      if (changed) {
-        feedback.tick(currentZoom < 0.35);
-        this.updatePreviewUI();
-      }
-
-      const targetIndex = Math.round(this.floatIndex);
-      const diffFromTarget = this.floatIndex - targetIndex;
-      const distUnits = 0.5 - Math.abs(diffFromTarget);
-      const distPx = Math.max(0, Math.round(distUnits * stepPx));
-      const direction = diffFromTarget > 0.08 ? 'up' : (diffFromTarget < -0.08 ? 'down' : 'center');
-
-      this.drumRight.updateGauge(distPx, direction, false);
-      if (currentZoom < 0.35) {
-        this.updatePuckCallout(`SZYBKO (${Math.round(currentZoom * 100)}%)`);
-      } else if (direction === 'center') {
-        this.updatePuckCallout('PRECYZJA (Puść aby zapisać)');
-      } else if (direction === 'up') {
-        this.updatePuckCallout(`▲ ${distPx}px do kolejnego`);
-      } else {
-        this.updatePuckCallout(`▼ ${distPx}px do poprzedniego`);
+        this.updatePuckCallout('▼ POPRZEDNI');
       }
     }
   }
@@ -546,33 +672,37 @@ export class GestureEngine {
     }
 
     // ZASADA WCZEŚNIEJSZEGO ZAKOŃCZENIA (EARLY RELEASE)
-    // Natychmiast zatwierdzamy aktualnie podświetlony element aktywnego kroku
     if (this.currentStep === 1) {
-      const item = this.drumLeft.getSelectedItem();
-      if (item) this.taskDraft.co = item.text;
+      const catItem = this.drumLeft.getSelectedItem();
+      if (catItem) {
+        this.taskDraft.category = catItem.name || catItem.text;
+        const firstCo = this.cachedData.coList[0];
+        if (firstCo) this.taskDraft.co = firstCo.text;
+      }
     } else if (this.currentStep === 2) {
       const item = this.drumRight.getSelectedItem();
-      if (item) this.taskDraft.skad = item.text;
+      if (item) this.taskDraft.co = item.text;
     } else if (this.currentStep === 3) {
       const item = this.drumLeft.getSelectedItem();
-      if (item) this.taskDraft.dokad = item.text;
+      if (item) this.taskDraft.skad = item.text;
     } else if (this.currentStep === 4) {
       const item = this.drumRight.getSelectedItem();
+      if (item) this.taskDraft.dokad = item.text;
+    } else if (this.currentStep === 5) {
+      const item = this.drumLeft.getSelectedItem();
       if (item) this.taskDraft.ile = item.text;
     }
 
-    // Zapisujemy zadanie, jeśli chociaż Krok 1 (CO) został wybrany
+    // Zapisujemy zadanie, jeśli chociaż towar został ustalony
     if (this.taskDraft.co) {
       const savedTask = storage.addTask(this.taskDraft);
       feedback.taskSaved();
 
-      // Odśwież dane TOP 6, ponieważ licznik użyć wzrósł
+      // Odśwież dane TOP na każdym etapie
       this.refreshData();
-
       this.onTaskSaved(savedTask);
     }
 
-    // Reset bębnów do pozycji startowej
     this.resetToStep1();
   }
 
@@ -601,6 +731,7 @@ export class GestureEngine {
       return;
     }
 
+    let cat = this.taskDraft.category;
     let co = this.taskDraft.co;
     let skad = this.taskDraft.skad;
     let dokad = this.taskDraft.dokad;
@@ -608,32 +739,37 @@ export class GestureEngine {
 
     if (this.currentStep === 1) {
       const item = this.drumLeft.getSelectedItem();
-      co = item ? item.text : '...';
+      cat = item ? (item.name || item.text) : '...';
     } else if (this.currentStep === 2) {
       const item = this.drumRight.getSelectedItem();
-      skad = item ? item.text : '...';
+      co = item ? item.text : '...';
     } else if (this.currentStep === 3) {
       const item = this.drumLeft.getSelectedItem();
-      dokad = item ? item.text : '...';
+      skad = item ? item.text : '...';
     } else if (this.currentStep === 4) {
       const item = this.drumRight.getSelectedItem();
+      dokad = item ? item.text : '...';
+    } else if (this.currentStep === 5) {
+      const item = this.drumLeft.getSelectedItem();
       ile = item ? item.text : '...';
     }
 
-    const coSpan = co
-      ? `<span class="preview-part ${this.currentStep === 1 ? 'preview-active' : 'preview-done'}">${this.escape(co)}</span>`
-      : `<span class="preview-placeholder">[CO]</span>`;
+    const coDisplay = co ? co : (cat ? `[${cat}]` : '[TOWAR]');
+
+    const coSpan = co || cat
+      ? `<span class="preview-part ${this.currentStep <= 2 ? 'preview-active' : 'preview-done'}">${this.escape(coDisplay)}</span>`
+      : `<span class="preview-placeholder">[TOWAR]</span>`;
 
     const skadSpan = skad
-      ? `<span class="preview-part ${this.currentStep === 2 ? 'preview-active' : 'preview-done'}">${this.escape(skad)}</span>`
+      ? `<span class="preview-part ${this.currentStep === 3 ? 'preview-active' : 'preview-done'}">${this.escape(skad)}</span>`
       : `<span class="preview-placeholder">[SKĄD]</span>`;
 
     const dokadSpan = dokad
-      ? `<span class="preview-part ${this.currentStep === 3 ? 'preview-active' : 'preview-done'}">${this.escape(dokad)}</span>`
+      ? `<span class="preview-part ${this.currentStep === 4 ? 'preview-active' : 'preview-done'}">${this.escape(dokad)}</span>`
       : `<span class="preview-placeholder">[DOKĄD]</span>`;
 
     const ileSpan = ile
-      ? `<span class="preview-part preview-qty ${this.currentStep === 4 ? 'preview-active' : 'preview-done'}">x${this.escape(ile)}</span>`
+      ? `<span class="preview-part preview-qty ${this.currentStep === 5 ? 'preview-active' : 'preview-done'}">x${this.escape(ile)}</span>`
       : `<span class="preview-placeholder">(x[ILE])</span>`;
 
     this.previewEl.innerHTML = `
@@ -650,13 +786,13 @@ export class GestureEngine {
 
   showPointerPuck(x, y) {
     if (!this.pointerPuckEl) return;
-    this.pointerPuckEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    this.pointerPuckEl.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
     this.pointerPuckEl.classList.add('visible');
   }
 
   updatePointerPuck(x, y) {
     if (!this.pointerPuckEl) return;
-    this.pointerPuckEl.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    this.pointerPuckEl.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
   }
 
   hidePointerPuck() {

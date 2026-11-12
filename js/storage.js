@@ -1,5 +1,11 @@
 // Zarządzanie stanem i trwałością w localStorage
-import { DEFAULT_DATABASE, INITIAL_TASKS, INITIAL_USAGE_STATS } from './data.js';
+import {
+  DEFAULT_DATABASE,
+  INITIAL_TASKS,
+  INITIAL_USAGE_STATS,
+  CATEGORY_DEFINITIONS,
+  getCategoryForItem
+} from './data.js';
 
 const STORAGE_KEYS = {
   DB: 'pingpong_warehouse_db_v1',
@@ -90,7 +96,7 @@ export class StorageManager {
     return { ...DEFAULT_DATABASE };
   }
 
-  // Statystyki użycia pozycji "CO"
+  // Statystyki użycia pozycji (dla każdego etapu)
   getStats() {
     try {
       const data = getStorage().getItem(STORAGE_KEYS.STATS);
@@ -101,10 +107,24 @@ export class StorageManager {
     }
   }
 
-  recordUsage(itemCo) {
-    if (!itemCo) return;
+  recordUsage(stageOrItem, maybeItem) {
+    let stage = 'co';
+    let item = stageOrItem;
+    if (maybeItem !== undefined) {
+      stage = stageOrItem;
+      item = maybeItem;
+    }
+    if (!item) return;
+
     const stats = this.getStats();
-    stats[itemCo] = (stats[itemCo] || 0) + 1;
+    if (stage === 'co') {
+      stats[item] = (stats[item] || 0) + 1;
+    } else {
+      const key = `_${stage}`;
+      if (!stats[key]) stats[key] = {};
+      stats[key][item] = (stats[key][item] || 0) + 1;
+    }
+
     try {
       getStorage().setItem(STORAGE_KEYS.STATS, JSON.stringify(stats));
     } catch (e) {
@@ -116,44 +136,116 @@ export class StorageManager {
     getStorage().setItem(STORAGE_KEYS.STATS, JSON.stringify({}));
   }
 
-  // Budowanie listy dla Kroku 1 (CO) z sekcją TOP 6 i listą alfabetyczną
-  getCoListWithTop() {
-    const db = this.getDatabase();
+  // Uniwersalne budowanie listy z czołówką TOP dla dowolnego etapu
+  getListWithTop(rawItems, stage = 'co', topLimit = 4) {
     const stats = this.getStats();
-    const rawList = Array.isArray(db.co) ? [...db.co] : [];
+    const list = Array.isArray(rawItems) ? [...rawItems] : [];
 
-    // Sortowanie alfabetyczne bazy podstawowej
-    rawList.sort((a, b) => a.localeCompare(b, 'pl', { sensitivity: 'base' }));
+    let stageStats = {};
+    if (stage === 'co') {
+      stageStats = stats;
+    } else {
+      stageStats = stats[`_${stage}`] || {};
+    }
 
-    // Obliczenie TOP 6 najczęściej używanych (z licznikami > 0)
-    const ranked = Object.entries(stats)
-      .filter(([name, count]) => count > 0 && rawList.includes(name))
+    // Wyłonienie pozycji TOP z najwyższymi licznikami użycia
+    const ranked = Object.entries(stageStats)
+      .filter(([name, count]) => typeof count === 'number' && count > 0 && list.includes(name))
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
+      .slice(0, topLimit)
       .map(([name, count]) => ({
         text: name,
         isTop: true,
         count: count
       }));
 
-    // Jeśli brak statystyk, bierzemy pierwsze 3-6 z bazy jako fallback
-    const topItems = ranked.length > 0 ? ranked : rawList.slice(0, 4).map(name => ({
-      text: name,
-      isTop: true,
-      count: 1
-    }));
+    // Fallback: jeśli brak statystyk dla danego etapu, bierzemy pierwsze z listy
+    const topItems = ranked.length > 0
+      ? ranked
+      : list.slice(0, Math.min(topLimit, list.length)).map(name => ({
+          text: name,
+          isTop: true,
+          count: 1
+        }));
 
-    const alphabeticalItems = rawList.map(name => ({
+    const regularItems = list.map(name => ({
       text: name,
       isTop: false,
-      count: stats[name] || 0
+      count: typeof stageStats[name] === 'number' ? stageStats[name] : 0
     }));
 
-    // Zwracamy spójną listę obiektów: najpierw TOP, potem reszta
     return {
       topCount: topItems.length,
-      items: [...topItems, ...alphabeticalItems]
+      items: [...topItems, ...regularItems]
     };
+  }
+
+  // Pobranie listy kategorii dla Kroku 1
+  getCategories() {
+    const db = this.getDatabase();
+    const coList = Array.isArray(db.co) ? db.co : [];
+
+    const counts = {};
+    for (const item of coList) {
+      const cat = getCategoryForItem(item);
+      counts[cat] = (counts[cat] || 0) + 1;
+    }
+
+    const categories = [
+      { id: 'all', name: '⭐ Wszystkie (i TOP)', icon: '⭐', count: coList.length }
+    ];
+
+    for (const def of CATEGORY_DEFINITIONS) {
+      if (def.id === 'all') continue;
+      const count = counts[def.name] || 0;
+      if (count > 0) {
+        categories.push({
+          id: def.id,
+          name: def.name,
+          icon: def.icon,
+          count: count
+        });
+      }
+    }
+
+    return categories;
+  }
+
+  // Budowanie listy dla Kroku 1/2 (CO) z opcjonalnym filtrem kategorii
+  getCoListWithTop(categoryName = null) {
+    const db = this.getDatabase();
+    let rawList = Array.isArray(db.co) ? [...db.co] : [];
+
+    rawList.sort((a, b) => a.localeCompare(b, 'pl', { sensitivity: 'base' }));
+
+    if (categoryName && categoryName !== 'all' && categoryName !== 'Wszystkie' && categoryName !== '⭐ Wszystkie (i TOP)') {
+      rawList = rawList.filter(item => getCategoryForItem(item) === categoryName);
+    }
+
+    return this.getListWithTop(rawList, 'co', 6);
+  }
+
+  // Budowanie listy dla SKĄD z czołówką TOP
+  getSkadListWithTop() {
+    const db = this.getDatabase();
+    let rawList = Array.isArray(db.lokalizacje) ? [...db.lokalizacje] : [];
+    rawList.sort((a, b) => a.localeCompare(b, 'pl', { sensitivity: 'base' }));
+    return this.getListWithTop(rawList, 'skad', 4);
+  }
+
+  // Budowanie listy dla DOKĄD z czołówką TOP
+  getDokadListWithTop() {
+    const db = this.getDatabase();
+    let rawList = Array.isArray(db.lokalizacje) ? [...db.lokalizacje] : [];
+    rawList.sort((a, b) => a.localeCompare(b, 'pl', { sensitivity: 'base' }));
+    return this.getListWithTop(rawList, 'dokad', 4);
+  }
+
+  // Budowanie listy dla ILE z czołówką TOP
+  getIleListWithTop() {
+    const db = this.getDatabase();
+    let rawList = Array.isArray(db.ile) ? [...db.ile] : [];
+    return this.getListWithTop(rawList, 'ile', 4);
   }
 
   // Zadania
@@ -186,10 +278,11 @@ export class StorageManager {
       console.error('Błąd zapisu zadania:', e);
     }
 
-    // Zapisz statystykę dla "CO"
-    if (newTask.co) {
-      this.recordUsage(newTask.co);
-    }
+    // Zapisz statystykę dla każdego wypełnionego etapu (CO, SKĄD, DOKĄD, ILE)
+    if (newTask.co) this.recordUsage('co', newTask.co);
+    if (newTask.skad) this.recordUsage('skad', newTask.skad);
+    if (newTask.dokad) this.recordUsage('dokad', newTask.dokad);
+    if (newTask.ile) this.recordUsage('ile', newTask.ile);
 
     return newTask;
   }

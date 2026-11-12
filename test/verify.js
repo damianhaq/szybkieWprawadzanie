@@ -120,6 +120,35 @@ console.assert(distToCommit === 62, `Od X=150px do rightThreshold (212px) powinn
 
 console.log('✓ Wskaźnik mikrodystansu oraz blokada korytarza przejścia w 100% poprawne');
 
+console.log('--- TEST 7: Rozbicie listy CO na kategorie (Krok 1 KATEGORIE) ---');
+const categories = sm.getCategories();
+console.assert(categories.length >= 8, `Oczekiwano co najmniej 8 kategorii, jest: ${categories.length}`);
+console.assert(categories[0].name.includes('Wszystkie'), 'Pierwsza kategoria to Wszystkie');
+
+const paletyItems = sm.getCoListWithTop('Palety i Nośniki');
+console.assert(paletyItems.items.length < coData.items.length, 'Przefiltrowana kategoria ma znacząco mniej pozycji');
+console.assert(paletyItems.items[0].isTop === true, 'Kategoria ma pozycję TOP na samej górze');
+console.log('✓ Rozbicie na kategorie działa poprawnie. Liczba kategorii:', categories.length, ', pozycje Palety:', paletyItems.items.length);
+
+console.log('--- TEST 8: Samoucząca się czołówka (TOP) na KAŻDYM etapie (SKĄD, DOKĄD, ILE) ---');
+const skadData = sm.getSkadListWithTop();
+const dokadData = sm.getDokadListWithTop();
+const ileData = sm.getIleListWithTop();
+
+console.assert(skadData.topCount >= 3, `SKĄD musi mieć >= 3 pozycji TOP, ma: ${skadData.topCount}`);
+console.assert(skadData.items[0].isTop === true, 'SKĄD pozycja 0 musi być TOP');
+
+console.assert(dokadData.topCount >= 3, `DOKĄD musi mieć >= 3 pozycji TOP, ma: ${dokadData.topCount}`);
+console.assert(dokadData.items[0].isTop === true, 'DOKĄD pozycja 0 musi być TOP');
+
+console.assert(ileData.topCount >= 3, `ILE musi mieć >= 3 pozycji TOP, ma: ${ileData.topCount}`);
+console.assert(ileData.items[0].isTop === true, 'ILE pozycja 0 musi być TOP');
+
+console.log('✓ TOP występuje na KAŻDYM etapie:');
+console.log('  SKĄD TOP 1:', skadData.items[0].text, `(${skadData.items[0].count}x)`);
+console.log('  DOKĄD TOP 1:', dokadData.items[0].text, `(${dokadData.items[0].count}x)`);
+console.log('  ILE TOP 1:', ileData.items[0].text, `(${ileData.items[0].count}x)`);
+
 console.log('\n========================================');
 console.log('WSZYSTKIE TESTY JEDNOSTKOWE ZAKOŃCZONE SUKCESEM!');
 console.log('========================================');
