@@ -149,6 +149,49 @@ console.log('  SKĄD TOP 1:', skadData.items[0].text, `(${skadData.items[0].coun
 console.log('  DOKĄD TOP 1:', dokadData.items[0].text, `(${dokadData.items[0].count}x)`);
 console.log('  ILE TOP 1:', ileData.items[0].text, `(${ileData.items[0].count}x)`);
 
+console.log('--- TEST 9: Dodawanie nowych elementów z wyborem lub tworzeniem nowej kategorii ---');
+// 1. Dodanie towaru do istniejącej kategorii
+const addRes1 = sm.addItem('Taśma wzmocniona włóknem szklanym', 'Folie i Taśmy');
+console.assert(addRes1 === true, 'Dodawanie towaru powinno zwrócić true');
+const catFolie = sm.getItemCategory('Taśma wzmocniona włóknem szklanym');
+console.assert(catFolie === 'Folie i Taśmy', `Oczekiwano kategorii "Folie i Taśmy", otrzymano: ${catFolie}`);
+
+// 2. Dodanie nowej kategorii i towaru do tej nowej kategorii
+const newCat = sm.addCustomCategory('Farmaceutyki i Leki', '💊');
+console.assert(newCat && newCat.name === 'Farmaceutyki i Leki', 'Nowa kategoria powinna zostać utworzona');
+console.assert(newCat.icon === '💊', 'Nowa kategoria powinna zachować podaną ikonę');
+
+const addRes2 = sm.addItem('Paracetamol 500mg opakowanie zbiorcze', 'Farmaceutyki i Leki');
+console.assert(addRes2 === true, 'Dodawanie towaru do nowej kategorii powinno zwrócić true');
+
+const catParacetamol = sm.getItemCategory('Paracetamol 500mg opakowanie zbiorcze');
+console.assert(catParacetamol === 'Farmaceutyki i Leki', `Oczekiwano "Farmaceutyki i Leki", otrzymano: ${catParacetamol}`);
+
+// 3. Sprawdzenie czy nowa kategoria pojawia się w getCategories()
+const allCats = sm.getCategories();
+const foundNewCat = allCats.find(c => c.name === 'Farmaceutyki i Leki');
+console.assert(foundNewCat !== undefined, 'Nowa kategoria musi znajdować się na liście kategorii');
+console.assert(foundNewCat.icon === '💊', 'Ikona nowej kategorii musi się zgadzać');
+console.assert(foundNewCat.count === 1, `Liczba pozycji w nowej kategorii powinna wynosić 1, wynosi: ${foundNewCat.count}`);
+
+// 4. Pobranie listy towarów z nowej kategorii
+const customCatItems = sm.getCoListWithTop('Farmaceutyki i Leki');
+console.assert(customCatItems.items.some(i => i.text === 'Paracetamol 500mg opakowanie zbiorcze'), 'Towar musi być na liście nowej kategorii');
+console.assert(customCatItems.items.every(i => sm.getItemCategory(i.text) === 'Farmaceutyki i Leki'), 'Wszystkie pozycje na liście należą do nowej kategorii');
+
+// 5. Dodanie nowej lokalizacji
+const addLocRes = sm.addLocation('Chłodnia Farmaceutyczna F-01');
+console.assert(addLocRes === true, 'Dodawanie lokalizacji powinno zwrócić true');
+const updatedSkad = sm.getSkadListWithTop();
+console.assert(updatedSkad.items.some(i => i.text === 'Chłodnia Farmaceutyczna F-01'), 'Nowa lokalizacja musi być dostępna w SKĄD');
+
+console.log('✓ Dodawanie elementów i obsługa nowych kategorii w 100% poprawne:', {
+  nowaKategoria: foundNewCat.name,
+  ikona: foundNewCat.icon,
+  towar: 'Paracetamol 500mg opakowanie zbiorcze',
+  lokalizacja: 'Chłodnia Farmaceutyczna F-01'
+});
+
 console.log('\n========================================');
 console.log('WSZYSTKIE TESTY JEDNOSTKOWE ZAKOŃCZONE SUKCESEM!');
 console.log('========================================');

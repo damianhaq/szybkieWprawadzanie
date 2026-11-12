@@ -11,7 +11,9 @@ const STORAGE_KEYS = {
   DB: 'pingpong_warehouse_db_v1',
   TASKS: 'pingpong_warehouse_tasks_v1',
   STATS: 'pingpong_warehouse_stats_v1',
-  SETTINGS: 'pingpong_warehouse_settings_v1'
+  SETTINGS: 'pingpong_warehouse_settings_v1',
+  CUSTOM_CATEGORIES: 'pingpong_warehouse_custom_categories_v1',
+  ITEM_CATEGORIES: 'pingpong_warehouse_item_categories_v1'
 };
 
 // Bezpieczny dostęp do localStorage (także w środowiskach testowych/SSR)
@@ -93,7 +95,132 @@ export class StorageManager {
 
   resetDatabaseToDefault() {
     getStorage().setItem(STORAGE_KEYS.DB, JSON.stringify(DEFAULT_DATABASE));
+    getStorage().removeItem(STORAGE_KEYS.CUSTOM_CATEGORIES);
+    getStorage().removeItem(STORAGE_KEYS.ITEM_CATEGORIES);
     return { ...DEFAULT_DATABASE };
+  }
+
+  // Własne kategorie użytkownika
+  getCustomCategories() {
+    try {
+      const data = getStorage().getItem(STORAGE_KEYS.CUSTOM_CATEGORIES);
+      return data ? JSON.parse(data) : [];
+    } catch (e) {
+      console.error('Błąd odczytu własnych kategorii:', e);
+      return [];
+    }
+  }
+
+  saveCustomCategories(cats) {
+    try {
+      getStorage().setItem(STORAGE_KEYS.CUSTOM_CATEGORIES, JSON.stringify(cats));
+    } catch (e) {
+      console.error('Błąd zapisu własnych kategorii:', e);
+    }
+  }
+
+  addCustomCategory(name, icon = '🏷️') {
+    const trimmed = (name || '').trim();
+    if (!trimmed) return null;
+
+    // Sprawdź czy kategoria o takiej nazwie już istnieje w definicjach wbudowanych
+    const builtIn = CATEGORY_DEFINITIONS.find(
+      c => c.name.toLowerCase() === trimmed.toLowerCase() || c.id === trimmed.toLowerCase()
+    );
+    if (builtIn) return builtIn;
+
+    const customCats = this.getCustomCategories();
+    const existing = customCats.find(
+      c => c.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (existing) return existing;
+
+    const cleanIcon = (icon || '🏷️').trim() || '🏷️';
+    const newCat = {
+      id: `custom_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: trimmed,
+      icon: cleanIcon
+    };
+    customCats.push(newCat);
+    this.saveCustomCategories(customCats);
+    return newCat;
+  }
+
+  getItemCategories() {
+    try {
+      const data = getStorage().getItem(STORAGE_KEYS.ITEM_CATEGORIES);
+      return data ? JSON.parse(data) : {};
+    } catch (e) {
+      console.error('Błąd odczytu mapowania kategorii:', e);
+      return {};
+    }
+  }
+
+  setItemCategory(itemName, categoryName) {
+    const trimmedItem = (itemName || '').trim();
+    const trimmedCat = (categoryName || '').trim();
+    if (!trimmedItem || !trimmedCat) return;
+
+    const map = this.getItemCategories();
+    map[trimmedItem] = trimmedCat;
+    try {
+      getStorage().setItem(STORAGE_KEYS.ITEM_CATEGORIES, JSON.stringify(map));
+    } catch (e) {
+      console.error('Błąd zapisu mapowania kategorii:', e);
+    }
+  }
+
+  getItemCategory(itemText) {
+    if (!itemText || typeof itemText !== 'string') return 'Inne towary';
+    const trimmed = itemText.trim();
+    const map = this.getItemCategories();
+    if (map[trimmed]) return map[trimmed];
+
+    // Opcjonalna obsługa formatu "[Kategoria] Towar"
+    const bracketMatch = trimmed.match(/^\[(.*?)\]\s*(.*)$/);
+    if (bracketMatch) {
+      return bracketMatch[1].trim();
+    }
+
+    return getCategoryForItem(trimmed);
+  }
+
+  // Dodawanie nowego towaru z opcjonalną kategorią
+  addItem(itemName, categoryName = null) {
+    const trimmed = (itemName || '').trim();
+    if (!trimmed) return false;
+
+    const db = this.getDatabase();
+    if (!Array.isArray(db.co)) db.co = [];
+
+    // Dodaj towar jeśli jeszcze go nie ma na liście
+    if (!db.co.includes(trimmed)) {
+      db.co.unshift(trimmed);
+      this.saveDatabase(db);
+    }
+
+    if (categoryName) {
+      this.addCustomCategory(categoryName);
+      this.setItemCategory(trimmed, categoryName);
+    }
+
+    return true;
+  }
+
+  // Dodawanie nowej lokalizacji (wspólnej dla SKĄD i DOKĄD)
+  addLocation(locationName) {
+    const trimmed = (locationName || '').trim();
+    if (!trimmed) return false;
+
+    const db = this.getDatabase();
+    if (!Array.isArray(db.lokalizacje)) db.lokalizacje = [];
+
+    if (!db.lokalizacje.includes(trimmed)) {
+      db.lokalizacje.unshift(trimmed);
+      this.saveDatabase(db);
+    }
+
+    return true;
   }
 
   // Statystyki użycia pozycji (dla każdego etapu)
@@ -180,14 +307,14 @@ export class StorageManager {
     };
   }
 
-  // Pobranie listy kategorii dla Kroku 1
-  getCategories() {
+  // Pobranie listy kategorii dla Kroku 1 (wbudowane + własne)
+  getCategories(includeEmpty = false) {
     const db = this.getDatabase();
     const coList = Array.isArray(db.co) ? db.co : [];
 
     const counts = {};
     for (const item of coList) {
-      const cat = getCategoryForItem(item);
+      const cat = this.getItemCategory(item);
       counts[cat] = (counts[cat] || 0) + 1;
     }
 
@@ -195,16 +322,49 @@ export class StorageManager {
       { id: 'all', name: '⭐ Wszystkie (i TOP)', icon: '⭐', count: coList.length }
     ];
 
+    const seenNames = new Set(['⭐ Wszystkie (i TOP)', 'Wszystkie (TOP)', 'Wszystkie', 'all']);
+
+    // 1. Kategorie wbudowane
     for (const def of CATEGORY_DEFINITIONS) {
       if (def.id === 'all') continue;
       const count = counts[def.name] || 0;
-      if (count > 0) {
+      if (includeEmpty || count > 0) {
         categories.push({
           id: def.id,
           name: def.name,
           icon: def.icon,
           count: count
         });
+        seenNames.add(def.name);
+      }
+    }
+
+    // 2. Własne kategorie dodane przez użytkownika
+    const customCats = this.getCustomCategories();
+    for (const c of customCats) {
+      if (seenNames.has(c.name)) continue;
+      const count = counts[c.name] || 0;
+      if (includeEmpty || count > 0) {
+        categories.push({
+          id: c.id,
+          name: c.name,
+          icon: c.icon || '🏷️',
+          count: count
+        });
+        seenNames.add(c.name);
+      }
+    }
+
+    // 3. Ewentualne kategorie wykryte z pozycji, a nieobecne na powyższych listach
+    for (const [catName, count] of Object.entries(counts)) {
+      if (!seenNames.has(catName) && count > 0) {
+        categories.push({
+          id: `cat_${catName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+          name: catName,
+          icon: '🏷️',
+          count: count
+        });
+        seenNames.add(catName);
       }
     }
 
@@ -218,8 +378,8 @@ export class StorageManager {
 
     rawList.sort((a, b) => a.localeCompare(b, 'pl', { sensitivity: 'base' }));
 
-    if (categoryName && categoryName !== 'all' && categoryName !== 'Wszystkie' && categoryName !== '⭐ Wszystkie (i TOP)') {
-      rawList = rawList.filter(item => getCategoryForItem(item) === categoryName);
+    if (categoryName && categoryName !== 'all' && categoryName !== 'Wszystkie' && categoryName !== '⭐ Wszystkie (i TOP)' && categoryName !== 'Wszystkie (TOP)') {
+      rawList = rawList.filter(item => this.getItemCategory(item) === categoryName);
     }
 
     return this.getListWithTop(rawList, 'co', 6);

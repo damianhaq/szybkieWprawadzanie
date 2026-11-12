@@ -14,7 +14,6 @@ export class UIManager {
 
     this.currentFilter = 'all'; // 'all' | 'active' | 'completed'
 
-    this.initCategoryBar();
     this.initDrawer();
     this.initModals();
     this.initDbEditor();
@@ -23,40 +22,6 @@ export class UIManager {
 
   setGestureEngine(engine) {
     this.gestureEngine = engine;
-  }
-
-  // Pasek szybkiego filtrowania kategorii
-  initCategoryBar() {
-    this.categoryPillTrack = document.getElementById('categoryPillTrack');
-    if (!this.categoryPillTrack) return;
-    this.renderCategoryPills();
-
-    this.categoryPillTrack.addEventListener('click', (e) => {
-      const btn = e.target.closest('.category-pill-btn');
-      if (!btn) return;
-      const catId = btn.dataset.catId;
-      const catName = btn.dataset.catName;
-      this.selectCategory(catId, catName);
-    });
-  }
-
-  renderCategoryPills(activeCatId = 'all') {
-    if (!this.categoryPillTrack) return;
-    const categories = storage.getCategories();
-    this.categoryPillTrack.innerHTML = categories.map(cat => `
-      <button type="button" class="category-pill-btn ${cat.id === activeCatId ? 'active' : ''}" data-cat-id="${cat.id}" data-cat-name="${cat.name}">
-        <span class="cat-pill-icon">${cat.icon}</span>
-        <span class="cat-pill-name">${cat.name.replace(' (i TOP)', '')}</span>
-        <span class="cat-pill-count">${cat.count}</span>
-      </button>
-    `).join('');
-  }
-
-  selectCategory(catId, catName) {
-    this.renderCategoryPills(catId);
-    if (this.gestureEngine) {
-      this.gestureEngine.setCategoryFilter(catId, catName);
-    }
   }
 
   // Obsługa dolnego panelu zadań (Bottom Drawer)
@@ -233,6 +198,7 @@ export class UIManager {
   initModals() {
     const btnOpenSettings = document.getElementById('btnOpenSettings');
     const btnCloseDb = document.getElementById('btnCloseDb');
+    const btnCloseDbFooter = document.getElementById('btnCloseDbFooter');
     const btnOpenInfo = document.getElementById('btnOpenInfo');
     const btnCloseInfo = document.getElementById('btnCloseInfo');
 
@@ -251,12 +217,17 @@ export class UIManager {
     if (btnOpenSettings) {
       btnOpenSettings.addEventListener('click', () => {
         this.loadDbToInputs();
+        this.loadCategorySelectOptions();
         openDialog(this.dbModal);
       });
     }
 
     if (btnCloseDb) {
       btnCloseDb.addEventListener('click', () => closeDialog(this.dbModal));
+    }
+
+    if (btnCloseDbFooter) {
+      btnCloseDbFooter.addEventListener('click', () => closeDialog(this.dbModal));
     }
 
     if (btnOpenInfo) {
@@ -308,8 +279,128 @@ export class UIManager {
     }
   }
 
+  // Wypełnienie listy wyboru kategorii w formularzu dodawania
+  loadCategorySelectOptions(preferredSelected = null) {
+    const select = document.getElementById('selectItemCategory');
+    if (!select) return;
+
+    const categories = storage.getCategories(true);
+    // Odfiltruj "Wszystkie" do wyboru konkretnej kategorii
+    const validCats = categories.filter(c => c.id !== 'all' && !c.name.includes('Wszystkie'));
+
+    let html = validCats.map(c => `
+      <option value="${this.escape(c.name)}" ${preferredSelected === c.name ? 'selected' : ''}>
+        ${c.icon || '🏷️'} ${this.escape(c.name)} (${c.count})
+      </option>
+    `).join('');
+
+    html += `<option value="__new__" ${preferredSelected === '__new__' ? 'selected' : ''}>➕ Utwórz nową kategorię...</option>`;
+    select.innerHTML = html;
+  }
+
   // Edytor bazy danych w modalu
   initDbEditor() {
+    // 1. Szybkie dodawanie towaru z kategorią
+    const formAddNewItem = document.getElementById('formAddNewItem');
+    const btnSubmitNewItem = document.getElementById('btnSubmitNewItem');
+    const inputNewItemName = document.getElementById('inputNewItemName');
+    const selectItemCategory = document.getElementById('selectItemCategory');
+    const newCatFields = document.getElementById('newCatFields');
+    const inputNewCatName = document.getElementById('inputNewCatName');
+    const inputNewCatIcon = document.getElementById('inputNewCatIcon');
+
+    if (selectItemCategory) {
+      selectItemCategory.addEventListener('change', () => {
+        if (selectItemCategory.value === '__new__') {
+          if (newCatFields) newCatFields.style.display = 'block';
+          if (inputNewCatName) inputNewCatName.focus();
+        } else {
+          if (newCatFields) newCatFields.style.display = 'none';
+        }
+      });
+    }
+
+    const handleAddItem = (e) => {
+      if (e) e.preventDefault();
+      const itemName = (inputNewItemName?.value || '').trim();
+      if (!itemName) {
+        this.showToast('Wpisz nazwę towaru!', 'error');
+        if (inputNewItemName) inputNewItemName.focus();
+        return;
+      }
+
+      let categoryName = selectItemCategory?.value || '';
+
+      if (categoryName === '__new__') {
+        const customCatName = (inputNewCatName?.value || '').trim();
+        if (!customCatName) {
+          this.showToast('Wpisz nazwę nowej kategorii!', 'error');
+          if (inputNewCatName) inputNewCatName.focus();
+          return;
+        }
+        const customIcon = (inputNewCatIcon?.value || '🏷️').trim() || '🏷️';
+        const created = storage.addCustomCategory(customCatName, customIcon);
+        categoryName = created ? created.name : customCatName;
+      }
+
+      storage.addItem(itemName, categoryName);
+
+      if (inputNewItemName) inputNewItemName.value = '';
+      if (inputNewCatName) inputNewCatName.value = '';
+      if (newCatFields) newCatFields.style.display = 'none';
+
+      this.loadCategorySelectOptions(categoryName);
+      this.loadDbToInputs();
+
+      if (this.gestureEngine) {
+        this.gestureEngine.refreshData();
+        this.gestureEngine.resetToStep1();
+      }
+
+      this.showToast(`✔ Dodano towar: "${itemName}" [${categoryName}]`, 'success');
+    };
+
+    if (formAddNewItem) {
+      formAddNewItem.addEventListener('submit', handleAddItem);
+    }
+    if (btnSubmitNewItem) {
+      btnSubmitNewItem.addEventListener('click', handleAddItem);
+    }
+
+    // 2. Szybkie dodawanie nowej lokalizacji
+    const formAddNewLocation = document.getElementById('formAddNewLocation');
+    const btnSubmitNewLocation = document.getElementById('btnSubmitNewLocation');
+    const inputNewLocation = document.getElementById('inputNewLocation');
+
+    const handleAddLocation = (e) => {
+      if (e) e.preventDefault();
+      const locName = (inputNewLocation?.value || '').trim();
+      if (!locName) {
+        this.showToast('Wpisz nazwę lokalizacji!', 'error');
+        if (inputNewLocation) inputNewLocation.focus();
+        return;
+      }
+
+      storage.addLocation(locName);
+      if (inputNewLocation) inputNewLocation.value = '';
+      this.loadDbToInputs();
+
+      if (this.gestureEngine) {
+        this.gestureEngine.refreshData();
+        this.gestureEngine.resetToStep1();
+      }
+
+      this.showToast(`✔ Dodano lokalizację: "${locName}"`, 'success');
+    };
+
+    if (formAddNewLocation) {
+      formAddNewLocation.addEventListener('submit', handleAddLocation);
+    }
+    if (btnSubmitNewLocation) {
+      btnSubmitNewLocation.addEventListener('click', handleAddLocation);
+    }
+
+    // 3. Hurtowy zapis z pól tekstowych
     const btnSaveDb = document.getElementById('btnSaveDb');
     const btnResetDbDefaults = document.getElementById('btnResetDbDefaults');
     const btnResetStats = document.getElementById('btnResetStats');
@@ -327,9 +418,27 @@ export class UIManager {
             .filter(line => line.length > 0);
 
         const parsedLokalizacje = parseLines(lokVal);
+        const parsedCoLines = parseLines(coVal);
+
+        // Opcjonalne wyciąganie kategorii z formatu "[Kategoria] Towar"
+        const cleanedCo = [];
+        parsedCoLines.forEach(line => {
+          const bracketMatch = line.match(/^\[(.*?)\]\s*(.*)$/);
+          if (bracketMatch) {
+            const cat = bracketMatch[1].trim();
+            const item = bracketMatch[2].trim();
+            if (cat && item) {
+              storage.addCustomCategory(cat);
+              storage.setItemCategory(item, cat);
+              cleanedCo.push(item);
+              return;
+            }
+          }
+          cleanedCo.push(line);
+        });
 
         const newDb = {
-          co: parseLines(coVal),
+          co: cleanedCo,
           lokalizacje: parsedLokalizacje,
           skad: parsedLokalizacje,
           dokad: parsedLokalizacje,
@@ -347,7 +456,8 @@ export class UIManager {
         }
 
         storage.saveDatabase(newDb);
-        this.renderCategoryPills();
+        this.loadCategorySelectOptions();
+
         if (this.gestureEngine) {
           this.gestureEngine.refreshData();
           this.gestureEngine.resetToStep1();
@@ -360,10 +470,11 @@ export class UIManager {
 
     if (btnResetDbDefaults) {
       btnResetDbDefaults.addEventListener('click', () => {
-        if (confirm('Czy na pewno chcesz przywrócić fabryczną bazę magazynową (ponad 60 towarów)?')) {
+        if (confirm('Czy na pewno chcesz przywrócić fabryczną bazę magazynową (ponad 70 towarów)?')) {
           storage.resetDatabaseToDefault();
           this.loadDbToInputs();
-          this.renderCategoryPills();
+          this.loadCategorySelectOptions();
+
           if (this.gestureEngine) {
             this.gestureEngine.refreshData();
             this.gestureEngine.resetToStep1();
@@ -375,14 +486,14 @@ export class UIManager {
 
     if (btnResetStats) {
       btnResetStats.addEventListener('click', () => {
-        if (confirm('Czy zresetować statystyki i wyczyścić czołówkę TOP 6?')) {
+        if (confirm('Czy zresetować statystyki i wyczyścić czołówkę TOP?')) {
           storage.resetStats();
           this.loadTopStatsView();
           if (this.gestureEngine) {
             this.gestureEngine.refreshData();
             this.gestureEngine.resetToStep1();
           }
-          this.showToast('Zresetowano statystyki TOP 6', 'info');
+          this.showToast('Zresetowano statystyki TOP', 'info');
         }
       });
     }
@@ -409,7 +520,9 @@ export class UIManager {
     if (!statsContainer) return;
 
     const stats = storage.getStats();
-    const entries = Object.entries(stats).sort((a, b) => b[1] - a[1]);
+    const entries = Object.entries(stats)
+      .filter(([name, count]) => !name.startsWith('_') && typeof count === 'number' && count > 0)
+      .sort((a, b) => b[1] - a[1]);
 
     if (entries.length === 0) {
       statsContainer.innerHTML = '<span class="empty-stats">Brak zarejestrowanych wyborów.</span>';

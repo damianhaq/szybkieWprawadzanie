@@ -52,13 +52,6 @@
       </div>
     </header>
 
-    <!-- Pasek szybkiego filtrowania kategorii (Category Nav) -->
-    <nav class="category-filter-nav" id="categoryFilterNav" aria-label="Szybki wybór kategorii">
-      <div class="category-pill-track" id="categoryPillTrack">
-        <!-- Generowane dynamicznie przez UIManager -->
-      </div>
-    </nav>
-
     <!-- 2. GŁÓWNY OBSZAR GESTÓW (GESTURE PAD - ~63%) -->
     <main class="gesture-pad" id="gesturePad">
       <!-- LEWA STREFA (0% - 50% szerokości) -->
@@ -170,10 +163,62 @@
         </div>
 
         <div class="modal-body">
-          <!-- Samoucząca się czołówka (TOP 6) -->
+          <!-- 1. SZYBKIE DODAWANIE NOWEGO TOWARU Z KATEGORIĄ -->
+          <div class="db-section-card">
+            <div class="modal-section-title">
+              <span>➕ Dodaj nowy towar</span>
+            </div>
+            <form id="formAddNewItem" class="db-form" onsubmit="return false;">
+              <div class="db-field-group">
+                <label class="db-field-label" for="inputNewItemName">
+                  <span>Nazwa towaru / przedmiotu</span>
+                </label>
+                <input type="text" id="inputNewItemName" class="db-input" placeholder="np. Folia stretch 17um, Wkrętarka..." required autocomplete="off">
+              </div>
+
+              <div class="db-field-group">
+                <label class="db-field-label" for="selectItemCategory">
+                  <span>Kategoria</span>
+                  <span class="db-field-help">Wybierz lub stwórz nową</span>
+                </label>
+                <select id="selectItemCategory" class="db-select">
+                  <!-- Wypełniane dynamicznie przez JS -->
+                </select>
+              </div>
+
+              <!-- Pola nowej kategorii (widoczne po wybraniu "+ Utwórz nową kategorię...") -->
+              <div class="db-field-group new-cat-box" id="newCatFields" style="display: none;">
+                <label class="db-field-label" for="inputNewCatName">
+                  <span>Nowa kategoria i ikona</span>
+                </label>
+                <div class="new-cat-inputs">
+                  <input type="text" id="inputNewCatIcon" class="db-input icon-input" value="🏷️" placeholder="Emoji" maxlength="4" title="Emoji kategorii">
+                  <input type="text" id="inputNewCatName" class="db-input name-input" placeholder="Wpisz nazwę nowej kategorii..." autocomplete="off">
+                </div>
+              </div>
+
+              <button type="submit" class="btn-primary btn-block" id="btnSubmitNewItem">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Dodaj towar do bazy</span>
+              </button>
+            </form>
+          </div>
+
+          <!-- 2. SZYBKIE DODAWANIE LOKALIZACJI -->
+          <div class="db-section-card">
+            <div class="modal-section-title">
+              <span>📍 Dodaj nową lokalizację (SKĄD / DOKĄD)</span>
+            </div>
+            <form id="formAddNewLocation" class="db-add-inline" onsubmit="return false;">
+              <input type="text" id="inputNewLocation" class="db-input" placeholder="np. Regał Wysoki D-01..08" required autocomplete="off">
+              <button type="submit" class="btn-secondary" id="btnSubmitNewLocation">Dodaj</button>
+            </form>
+          </div>
+
+          <!-- 3. SAMOUCZĄCA SIĘ CZOŁÓWKA (TOP) -->
           <div>
             <div class="modal-section-title">
-              <span>🔥 Najczęstsze towary (Czołówka TOP 6)</span>
+              <span>🔥 Najczęstsze towary (Czołówka TOP)</span>
               <button type="button" class="btn-danger-ghost" id="btnResetStats">Zresetuj liczniki</button>
             </div>
             <div class="top-stats-grid" id="topStatsList">
@@ -181,7 +226,7 @@
             </div>
           </div>
 
-          <!-- Ustawienia dźwięku i haptyki -->
+          <!-- 4. USTAWIENIA DŹWIĘKU I HAPTYKI -->
           <div>
             <div class="modal-section-title">Sygnalizacja</div>
             <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -208,37 +253,50 @@
             </div>
           </div>
 
-          <!-- Edycja CO -->
-          <div class="db-field-group">
-            <label class="db-field-label" for="textareaCo">
-              <span>Lista 1: CO (Towary / Czynności)</span>
-              <span class="db-field-help">1 pozycja w linii</span>
-            </label>
-            <textarea id="textareaCo" class="db-textarea" rows="5"></textarea>
-          </div>
+          <!-- 5. HURTOWA EDYCJA POZYCJI W POLACH TEKSTOWYCH (DLA ZAAWANSOWANYCH) -->
+          <details class="db-details-accordion">
+            <summary class="db-details-summary">
+              <span>✏️ Hurtowa edycja list (pola tekstowe)</span>
+              <span class="db-details-arrow">▾</span>
+            </summary>
+            <div class="db-details-content">
+              <!-- Edycja CO -->
+              <div class="db-field-group">
+                <label class="db-field-label" for="textareaCo">
+                  <span>Lista 1: CO (Towary / Czynności)</span>
+                  <span class="db-field-help">1 w linii • np. [Kategoria] Towar</span>
+                </label>
+                <textarea id="textareaCo" class="db-textarea" rows="5"></textarea>
+              </div>
 
-          <!-- Edycja LOKALIZACJI (Wspólne dla SKĄD i DOKĄD) -->
-          <div class="db-field-group">
-            <label class="db-field-label" for="textareaLokalizacje">
-              <span>Lista 2: LOKALIZACJE (SKĄD / DOKĄD)</span>
-              <span class="db-field-help">Wspólna lista • 1 w linii</span>
-            </label>
-            <textarea id="textareaLokalizacje" class="db-textarea" rows="5" placeholder="Np. Rampa 01, Regał Wysoki A-01, Pakowalnia..."></textarea>
-          </div>
+              <!-- Edycja LOKALIZACJI -->
+              <div class="db-field-group">
+                <label class="db-field-label" for="textareaLokalizacje">
+                  <span>Lista 2: LOKALIZACJE (SKĄD / DOKĄD)</span>
+                  <span class="db-field-help">Wspólna lista • 1 w linii</span>
+                </label>
+                <textarea id="textareaLokalizacje" class="db-textarea" rows="4" placeholder="Np. Rampa 01, Regał Wysoki A-01, Pakowalnia..."></textarea>
+              </div>
 
-          <!-- Edycja ILE -->
-          <div class="db-field-group">
-            <label class="db-field-label" for="textareaIle">
-              <span>Lista 3: ILE (Ilości / Jednostki)</span>
-              <span class="db-field-help">1 pozycja w linii</span>
-            </label>
-            <textarea id="textareaIle" class="db-textarea" rows="4"></textarea>
-          </div>
+              <!-- Edycja ILE -->
+              <div class="db-field-group">
+                <label class="db-field-label" for="textareaIle">
+                  <span>Lista 3: ILE (Ilości / Jednostki)</span>
+                  <span class="db-field-help">1 w linii</span>
+                </label>
+                <textarea id="textareaIle" class="db-textarea" rows="3"></textarea>
+              </div>
+
+              <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+                <button type="button" class="btn-primary" id="btnSaveDb">Zapisz listy</button>
+              </div>
+            </div>
+          </details>
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn-secondary" id="btnResetDbDefaults">Fabryczna baza (60+)</button>
-          <button type="button" class="btn-primary" id="btnSaveDb">Zapisz zmiany</button>
+          <button type="button" class="btn-secondary" id="btnResetDbDefaults">Fabryczna baza (70+)</button>
+          <button type="button" class="btn-secondary" id="btnCloseDbFooter">Zamknij</button>
         </div>
       </div>
     </dialog>
